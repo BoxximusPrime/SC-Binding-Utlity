@@ -39,6 +39,7 @@
                     <button id="start-debug-btn" class="btn btn-primary">▶ Start Detecting</button>
                     <button id="stop-debug-btn" class="btn btn-secondary" disabled>⏸ Stop Detecting</button>
                     <button id="clear-debug-btn" class="btn btn-secondary">🗑️ Clear Log</button>
+                    <button id="show-devices-btn" class="btn btn-secondary">🎮 Show Devices</button>
                     <span id="debug-status" class="status-indicator">Ready</span>
                 </div>
 
@@ -86,6 +87,21 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- Device List Modal -->
+    <div id="device-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎮 Connected Devices</h2>
+                <button id="close-modal-btn" class="btn-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="device-list" class="device-list">
+                    <div class="loading">Loading devices...</div>
+                </div>
+            </div>
         </div>
     </div>
 

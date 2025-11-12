@@ -1,8 +1,64 @@
 use serde::Serialize;
 use gilrs::{Gilrs, EventType, Button, Axis};
 use std::time::{Duration, Instant};
+use std::thread;
 use tauri::Emitter;
 use rusty_xinput::XInputHandle;
+
+/// Determine if a device is a gamepad (Xbox-style controller) or a joystick (HOTAS/flight stick)
+/// Based on the device name and button/axis count
+fn is_gamepad(name: &str, _gamepad: &gilrs::Gamepad) -> bool {
+    let name_lower = name.to_lowercase();
+    
+    eprintln!("is_gamepad: Checking device: '{}'", name);
+    
+    // Common joystick/HOTAS identifiers - CHECK THESE FIRST to avoid misidentification
+    let joystick_indicators = [
+        "joystick",
+        "hotas",
+        "throttle",
+        "gladiator",
+        "warthog",
+        "t16000",
+        "vkb",
+        "vkbsim",
+        "virpil",
+        "thrustmaster",
+        "saitek",
+        "x52",
+        "x56",
+    ];
+    
+    // If it has a joystick indicator, it's definitely NOT a gamepad
+    if joystick_indicators.iter().any(|indicator| name_lower.contains(indicator)) {
+        eprintln!("is_gamepad: '{}' identified as JOYSTICK", name);
+        return false;
+    }
+    
+    // Common gamepad identifiers in device names
+    let gamepad_indicators = [
+        "xbox",
+        "playstation",
+        "dualshock",
+        "dualsense",
+        "ps3",
+        "ps4",
+        "ps5",
+        "controller for windows", // Xbox 360/One Controller for Windows
+        "gamepad",
+        "xinput",
+    ];
+    
+    // Check if name contains any gamepad indicators
+    if gamepad_indicators.iter().any(|indicator| name_lower.contains(indicator)) {
+        eprintln!("is_gamepad: '{}' identified as GAMEPAD", name);
+        return true;
+    }
+    
+    // Generic devices that don't match either pattern default to JOYSTICK
+    eprintln!("is_gamepad: '{}' defaulting to JOYSTICK (generic device)", name);
+    false
+}
 
 // Get currently pressed modifiers using Windows API
 #[cfg(windows)]
@@ -67,6 +123,7 @@ pub struct JoystickInfo {
     pub button_count: usize,
     pub axis_count: usize,
     pub hat_count: usize,
+    pub device_type: String,
 }
 
 use std::collections::HashMap;
@@ -88,11 +145,30 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
     let xinput = XInputHandle::load_default().map_err(|e| format!("Failed to load XInput: {:?}", e))?;
     let mut xinput_prev_states = [None, None, None, None]; // Track previous state for 4 possible controllers
     
+    // Track XInput axis states (controller_id, axis_index) -> last triggered direction
+    let mut xinput_axis_states: HashMap<(u32, u32), AxisState> = HashMap::new();
+    
     // Initialize XInput states
     for i in 0..4 {
         if let Ok(state) = xinput.get_state(i) {
             xinput_prev_states[i as usize] = Some(state);
             eprintln!("wait_for_input: XInput controller {} initialized", i);
+            
+            // Initialize axis states for this controller
+            // Normalize XInput values to -1.0 to 1.0 range
+            let left_x = (state.raw.Gamepad.sThumbLX as f32) / 32768.0;
+            let left_y = (state.raw.Gamepad.sThumbLY as f32) / 32768.0;
+            let right_x = (state.raw.Gamepad.sThumbRX as f32) / 32768.0;
+            let right_y = (state.raw.Gamepad.sThumbRY as f32) / 32768.0;
+            let left_trigger = (state.raw.Gamepad.bLeftTrigger as f32) / 255.0;
+            let right_trigger = (state.raw.Gamepad.bRightTrigger as f32) / 255.0;
+            
+            xinput_axis_states.insert((i, 1), AxisState { last_value: left_x, last_triggered_direction: None });
+            xinput_axis_states.insert((i, 2), AxisState { last_value: left_y, last_triggered_direction: None });
+            xinput_axis_states.insert((i, 3), AxisState { last_value: right_x, last_triggered_direction: None });
+            xinput_axis_states.insert((i, 4), AxisState { last_value: right_y, last_triggered_direction: None });
+            xinput_axis_states.insert((i, 5), AxisState { last_value: left_trigger * 2.0 - 1.0, last_triggered_direction: None });
+            xinput_axis_states.insert((i, 6), AxisState { last_value: right_trigger * 2.0 - 1.0, last_triggered_direction: None });
         }
     }
     
@@ -144,23 +220,30 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
                     let joystick_id: usize = event.id.into();
                     let sc_instance = joystick_id + 1; // 1-based indexing for Star Citizen
                     
+                    // Get the gamepad to check if it's a gamepad or joystick
+                    let gamepad = gilrs.gamepad(event.id);
+                    let device_name = gamepad.name();
+                    let is_gp = is_gamepad(device_name, &gamepad);
+                    let device_prefix = if is_gp { "gp" } else { "js" };
+                    let device_type_name = if is_gp { "Gamepad" } else { "Joystick" };
+                    
                     // First check if this is a known DPad button
                     let (input_string, display_name) = match button {
                         Button::DPadUp => (
-                            format!("js{}_hat1_up", sc_instance),
-                            format!("Joystick {} - Hat 1 UP", sc_instance)
+                            format!("{}{}_hat1_up", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 UP", device_type_name, sc_instance)
                         ),
                         Button::DPadDown => (
-                            format!("js{}_hat1_down", sc_instance),
-                            format!("Joystick {} - Hat 1 DOWN", sc_instance)
+                            format!("{}{}_hat1_down", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 DOWN", device_type_name, sc_instance)
                         ),
                         Button::DPadLeft => (
-                            format!("js{}_hat1_left", sc_instance),
-                            format!("Joystick {} - Hat 1 LEFT", sc_instance)
+                            format!("{}{}_hat1_left", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 LEFT", device_type_name, sc_instance)
                         ),
                         Button::DPadRight => (
-                            format!("js{}_hat1_right", sc_instance),
-                            format!("Joystick {} - Hat 1 RIGHT", sc_instance)
+                            format!("{}{}_hat1_right", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 RIGHT", device_type_name, sc_instance)
                         ),
                         _ => {
                             // Regular button - extract the button index from the Code
@@ -182,14 +265,14 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
                             
                             if button_index > 0 {
                                 (
-                                    format!("js{}_button{}", sc_instance, button_index),
-                                    format!("Joystick {} - Button {}", sc_instance, button_index)
+                                    format!("{}{}_button{}", device_prefix, sc_instance, button_index),
+                                    format!("{} {} - Button {}", device_type_name, sc_instance, button_index)
                                 )
                             } else {
                                 // Fallback if parsing fails
                                 (
-                                    format!("js{}_button_unknown", sc_instance),
-                                    format!("Joystick {} - Button Unknown", sc_instance)
+                                    format!("{}{}_button_unknown", device_prefix, sc_instance),
+                                    format!("{} {} - Button Unknown", device_type_name, sc_instance)
                                 )
                             }
                         }
@@ -198,7 +281,7 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
                     return Ok(Some(DetectedInput {
                         input_string,
                         display_name,
-                        device_type: "Joystick".to_string(),
+                        device_type: device_type_name.to_string(),
                         axis_value: None,
                         modifiers: get_active_modifiers(),
                         is_modifier: false,
@@ -208,6 +291,13 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
                 EventType::AxisChanged(axis, value, code) => {
                     let joystick_id: usize = event.id.into();
                     let sc_instance = joystick_id + 1; // 1-based indexing for Star Citizen
+                    
+                    // Get the gamepad to check if it's a gamepad or joystick
+                    let gamepad = gilrs.gamepad(event.id);
+                    let device_name = gamepad.name();
+                    let is_gp = is_gamepad(device_name, &gamepad);
+                    let device_prefix = if is_gp { "gp" } else { "js" };
+                    let device_type_name = if is_gp { "Gamepad" } else { "Joystick" };
                     
                     // Extract axis index from the Code debug representation
                     let code_str = format!("{:?}", code);
@@ -276,9 +366,9 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
                             };
                             
                             return Ok(Some(DetectedInput {
-                                input_string: format!("js{}_axis{}_{}", sc_instance, axis_index, direction),
-                                display_name: format!("Joystick {} - {} {} (Axis {})", sc_instance, axis_name, direction_symbol, axis_index),
-                                device_type: "Joystick".to_string(),
+                                input_string: format!("{}{}_axis{}_{}", device_prefix, sc_instance, axis_index, direction),
+                                display_name: format!("{} {} - {} {} (Axis {})", device_type_name, sc_instance, axis_name, direction_symbol, axis_index),
+                                device_type: device_type_name.to_string(),
                                 axis_value: Some(value),
                                 modifiers: get_active_modifiers(),
                                 is_modifier: false,
@@ -291,7 +381,7 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
             }
         }
         
-        // Poll XInput controllers for button presses
+        // Poll XInput controllers for button presses and axis movements
         for controller_id in 0..4 {
             if let Ok(state) = xinput.get_state(controller_id) {
                 if let Some(prev_state) = &xinput_prev_states[controller_id as usize] {
@@ -310,8 +400,8 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
                         else if buttons_pressed & 0x0200 != 0 { 6 }                  // RB
                         else if buttons_pressed & 0x0010 != 0 { 7 }                  // Back
                         else if buttons_pressed & 0x0020 != 0 { 8 }                  // Start
-                        else if buttons_pressed & 0x0040 != 0 { 9 }                  // LS
-                        else if buttons_pressed & 0x0080 != 0 { 10 }                 // RS
+                        else if buttons_pressed & 0x0040 != 0 { 9 }                  // LS (Left Stick Click)
+                        else if buttons_pressed & 0x0080 != 0 { 10 }                 // RS (Right Stick Click)
                         else if buttons_pressed & 0x0001 != 0 { 11 }                 // DPad Up
                         else if buttons_pressed & 0x0002 != 0 { 12 }                 // DPad Down
                         else if buttons_pressed & 0x0004 != 0 { 13 }                 // DPad Left
@@ -320,11 +410,68 @@ pub fn wait_for_input(session_id: String, timeout_secs: u64) -> Result<Option<De
                         
                         if button_num > 0 {
                             let sc_instance = controller_id as usize + 1;
+                            // XInput is specifically for Xbox controllers, so use gp prefix
                             return Ok(Some(DetectedInput {
-                                input_string: format!("js{}_button{}", sc_instance, button_num),
-                                display_name: format!("Joystick {} - Button {}", sc_instance, button_num),
-                                device_type: "Joystick".to_string(),
+                                input_string: format!("gp{}_button{}", sc_instance, button_num),
+                                display_name: format!("Gamepad {} - Button {}", sc_instance, button_num),
+                                device_type: "Gamepad".to_string(),
                                 axis_value: None,
+                                modifiers: get_active_modifiers(),
+                                is_modifier: false,
+                                session_id: session_id.clone(),
+                            }));
+                        }
+                    }
+                    
+                    // Check for axis movements
+                    // Normalize XInput values to -1.0 to 1.0 range
+                    let axes = [
+                        (1, (state.raw.Gamepad.sThumbLX as f32) / 32768.0, "Left Stick X"),
+                        (2, (state.raw.Gamepad.sThumbLY as f32) / 32768.0, "Left Stick Y"),
+                        (3, (state.raw.Gamepad.sThumbRX as f32) / 32768.0, "Right Stick X"),
+                        (4, (state.raw.Gamepad.sThumbRY as f32) / 32768.0, "Right Stick Y"),
+                        (5, (state.raw.Gamepad.bLeftTrigger as f32) / 255.0 * 2.0 - 1.0, "Left Trigger"),
+                        (6, (state.raw.Gamepad.bRightTrigger as f32) / 255.0 * 2.0 - 1.0, "Right Trigger"),
+                    ];
+                    
+                    for (axis_index, value, axis_name) in axes.iter() {
+                        let axis_key = (controller_id, *axis_index);
+                        let state_entry = xinput_axis_states.entry(axis_key).or_insert(AxisState {
+                            last_value: *value,
+                            last_triggered_direction: None,
+                        });
+                        
+                        let movement_delta = (value - state_entry.last_value).abs();
+                        const MOVEMENT_THRESHOLD: f32 = 0.3;
+                        const AXIS_TRIGGER_THRESHOLD: f32 = 0.5;
+                        const AXIS_RESET_THRESHOLD: f32 = 0.3;
+                        
+                        let is_positive = *value > AXIS_TRIGGER_THRESHOLD;
+                        let is_negative = *value < -AXIS_TRIGGER_THRESHOLD;
+                        let is_centered = value.abs() < AXIS_RESET_THRESHOLD;
+                        let has_moved_enough = movement_delta > MOVEMENT_THRESHOLD;
+                        
+                        if is_centered {
+                            state_entry.last_triggered_direction = None;
+                            state_entry.last_value = *value;
+                        }
+                        
+                        let should_trigger_positive = is_positive && has_moved_enough && state_entry.last_triggered_direction != Some(true);
+                        let should_trigger_negative = is_negative && has_moved_enough && state_entry.last_triggered_direction != Some(false);
+                        
+                        if should_trigger_positive || should_trigger_negative {
+                            let direction = if should_trigger_positive { "positive" } else { "negative" };
+                            let direction_symbol = if should_trigger_positive { "+" } else { "-" };
+                            
+                            state_entry.last_triggered_direction = Some(should_trigger_positive);
+                            state_entry.last_value = *value;
+                            
+                            let sc_instance = controller_id as usize + 1;
+                            return Ok(Some(DetectedInput {
+                                input_string: format!("gp{}_axis{}_{}", sc_instance, axis_index, direction),
+                                display_name: format!("Gamepad {} - {} {} (Axis {})", sc_instance, axis_name, direction_symbol, axis_index),
+                                device_type: "Gamepad".to_string(),
+                                axis_value: Some(*value),
                                 modifiers: get_active_modifiers(),
                                 is_modifier: false,
                                 session_id: session_id.clone(),
@@ -413,22 +560,29 @@ pub fn wait_for_multiple_inputs(session_id: String, initial_timeout_secs: u64, c
                     let joystick_id: usize = event.id.into();
                     let sc_instance = joystick_id + 1;
                     
+                    // Get the gamepad to check if it's a gamepad or joystick
+                    let gamepad = gilrs.gamepad(event.id);
+                    let device_name = gamepad.name();
+                    let is_gp = is_gamepad(device_name, &gamepad);
+                    let device_prefix = if is_gp { "gp" } else { "js" };
+                    let device_type_name = if is_gp { "Gamepad" } else { "Joystick" };
+                    
                     let (input_string, display_name) = match button {
                         Button::DPadUp => (
-                            format!("js{}_hat1_up", sc_instance),
-                            format!("Joystick {} - Hat 1 UP", sc_instance)
+                            format!("{}{}_hat1_up", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 UP", device_type_name, sc_instance)
                         ),
                         Button::DPadDown => (
-                            format!("js{}_hat1_down", sc_instance),
-                            format!("Joystick {} - Hat 1 DOWN", sc_instance)
+                            format!("{}{}_hat1_down", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 DOWN", device_type_name, sc_instance)
                         ),
                         Button::DPadLeft => (
-                            format!("js{}_hat1_left", sc_instance),
-                            format!("Joystick {} - Hat 1 LEFT", sc_instance)
+                            format!("{}{}_hat1_left", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 LEFT", device_type_name, sc_instance)
                         ),
                         Button::DPadRight => (
-                            format!("js{}_hat1_right", sc_instance),
-                            format!("Joystick {} - Hat 1 RIGHT", sc_instance)
+                            format!("{}{}_hat1_right", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 RIGHT", device_type_name, sc_instance)
                         ),
                         _ => {
                             let code_str = format!("{:?}", code);
@@ -445,13 +599,13 @@ pub fn wait_for_multiple_inputs(session_id: String, initial_timeout_secs: u64, c
                             
                             if button_index > 0 {
                                 (
-                                    format!("js{}_button{}", sc_instance, button_index),
-                                    format!("Joystick {} - Button {}", sc_instance, button_index)
+                                    format!("{}{}_button{}", device_prefix, sc_instance, button_index),
+                                    format!("{} {} - Button {}", device_type_name, sc_instance, button_index)
                                 )
                             } else {
                                 (
-                                    format!("js{}_button_unknown", sc_instance),
-                                    format!("Joystick {} - Button Unknown", sc_instance)
+                                    format!("{}{}_button_unknown", device_prefix, sc_instance),
+                                    format!("{} {} - Button Unknown", device_type_name, sc_instance)
                                 )
                             }
                         }
@@ -460,7 +614,7 @@ pub fn wait_for_multiple_inputs(session_id: String, initial_timeout_secs: u64, c
                     Some(DetectedInput {
                         input_string,
                         display_name,
-                        device_type: "Joystick".to_string(),
+                        device_type: device_type_name.to_string(),
                         axis_value: None,
                         modifiers: get_active_modifiers(),
                         is_modifier: false,
@@ -470,6 +624,13 @@ pub fn wait_for_multiple_inputs(session_id: String, initial_timeout_secs: u64, c
                 EventType::AxisChanged(axis, value, code) => {
                     let joystick_id: usize = event.id.into();
                     let sc_instance = joystick_id + 1;
+                    
+                    // Get the gamepad to check if it's a gamepad or joystick
+                    let gamepad = gilrs.gamepad(event.id);
+                    let device_name = gamepad.name();
+                    let is_gp = is_gamepad(device_name, &gamepad);
+                    let device_prefix = if is_gp { "gp" } else { "js" };
+                    let device_type_name = if is_gp { "Gamepad" } else { "Joystick" };
                     
                     let code_str = format!("{:?}", code);
                     let axis_index = if let Some(start) = code_str.find("index: ") {
@@ -524,9 +685,9 @@ pub fn wait_for_multiple_inputs(session_id: String, initial_timeout_secs: u64, c
                             };
                             
                             Some(DetectedInput {
-                                input_string: format!("js{}_axis{}_{}", sc_instance, axis_index, direction),
-                                display_name: format!("Joystick {} - {} {} (Axis {})", sc_instance, axis_name, direction_symbol, axis_index),
-                                device_type: "Joystick".to_string(),
+                                input_string: format!("{}{}_axis{}_{}", device_prefix, sc_instance, axis_index, direction),
+                                display_name: format!("{} {} - {} {} (Axis {})", device_type_name, sc_instance, axis_name, direction_symbol, axis_index),
+                                device_type: device_type_name.to_string(),
                                 axis_value: Some(value),
                                 modifiers: get_active_modifiers(),
                                 is_modifier: false,
@@ -628,22 +789,29 @@ pub fn wait_for_inputs_with_events(window: tauri::Window, session_id: String, in
                     let joystick_id: usize = event.id.into();
                     let sc_instance = joystick_id + 1;
                     
+                    // Get the gamepad to check if it's a gamepad or joystick
+                    let gamepad = gilrs.gamepad(event.id);
+                    let device_name = gamepad.name();
+                    let is_gp = is_gamepad(device_name, &gamepad);
+                    let device_prefix = if is_gp { "gp" } else { "js" };
+                    let device_type_name = if is_gp { "Gamepad" } else { "Joystick" };
+                    
                     let (input_string, display_name) = match button {
                         Button::DPadUp => (
-                            format!("js{}_hat1_up", sc_instance),
-                            format!("Joystick {} - Hat 1 UP", sc_instance)
+                            format!("{}{}_hat1_up", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 UP", device_type_name, sc_instance)
                         ),
                         Button::DPadDown => (
-                            format!("js{}_hat1_down", sc_instance),
-                            format!("Joystick {} - Hat 1 DOWN", sc_instance)
+                            format!("{}{}_hat1_down", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 DOWN", device_type_name, sc_instance)
                         ),
                         Button::DPadLeft => (
-                            format!("js{}_hat1_left", sc_instance),
-                            format!("Joystick {} - Hat 1 LEFT", sc_instance)
+                            format!("{}{}_hat1_left", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 LEFT", device_type_name, sc_instance)
                         ),
                         Button::DPadRight => (
-                            format!("js{}_hat1_right", sc_instance),
-                            format!("Joystick {} - Hat 1 RIGHT", sc_instance)
+                            format!("{}{}_hat1_right", device_prefix, sc_instance),
+                            format!("{} {} - Hat 1 RIGHT", device_type_name, sc_instance)
                         ),
                         _ => {
                             let code_str = format!("{:?}", code);
@@ -660,8 +828,8 @@ pub fn wait_for_inputs_with_events(window: tauri::Window, session_id: String, in
                             
                             if button_index > 0 {
                                 (
-                                    format!("js{}_button{}", sc_instance, button_index),
-                                    format!("Joystick {} - Button {}", sc_instance, button_index)
+                                    format!("{}{}_button{}", device_prefix, sc_instance, button_index),
+                                    format!("{} {} - Button {}", device_type_name, sc_instance, button_index)
                                 )
                             } else {
                                 continue;
@@ -672,7 +840,7 @@ pub fn wait_for_inputs_with_events(window: tauri::Window, session_id: String, in
                     Some(DetectedInput {
                         input_string,
                         display_name,
-                        device_type: "Joystick".to_string(),
+                        device_type: device_type_name.to_string(),
                         axis_value: None,
                         modifiers: get_active_modifiers(),
                         is_modifier: false,
@@ -682,6 +850,13 @@ pub fn wait_for_inputs_with_events(window: tauri::Window, session_id: String, in
                 EventType::AxisChanged(axis, value, code) => {
                     let joystick_id: usize = event.id.into();
                     let sc_instance = joystick_id + 1;
+                    
+                    // Get the gamepad to check if it's a gamepad or joystick
+                    let gamepad = gilrs.gamepad(event.id);
+                    let device_name = gamepad.name();
+                    let is_gp = is_gamepad(device_name, &gamepad);
+                    let device_prefix = if is_gp { "gp" } else { "js" };
+                    let device_type_name = if is_gp { "Gamepad" } else { "Joystick" };
                     
                     let axis_index = match axis {
                         Axis::LeftStickX => 1,
@@ -739,9 +914,9 @@ pub fn wait_for_inputs_with_events(window: tauri::Window, session_id: String, in
                             let direction_symbol = if direction == "positive" { "+" } else { "-" };
                             
                             Some(DetectedInput {
-                                input_string: format!("js{}_axis{}_{}", sc_instance, axis_index, direction),
-                                display_name: format!("Joystick {} - {} {} (Axis {})", sc_instance, axis_name, direction_symbol, axis_index),
-                                device_type: "Joystick".to_string(),
+                                input_string: format!("{}{}_axis{}_{}", device_prefix, sc_instance, axis_index, direction),
+                                display_name: format!("{} {} - {} {} (Axis {})", device_type_name, sc_instance, axis_name, direction_symbol, axis_index),
+                                device_type: device_type_name.to_string(),
                                 axis_value: Some(value),
                                 modifiers: get_active_modifiers(),
                                 is_modifier: false,
@@ -779,12 +954,23 @@ pub fn wait_for_inputs_with_events(window: tauri::Window, session_id: String, in
 
 /// Get list of available joysticks
 pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
-    let gilrs = Gilrs::new().map_err(|e| e.to_string())?;
+    let mut gilrs = Gilrs::new().map_err(|e| e.to_string())?;
     
     let mut joysticks = Vec::new();
     
     eprintln!("=== Gilrs Gamepad Detection ===");
     eprintln!("Gilrs version: {}", env!("CARGO_PKG_VERSION"));
+    
+    // Give gilrs a moment to initialize
+    thread::sleep(Duration::from_millis(100));
+    
+    // Process any pending events to ensure device list is up to date
+    while let Some(_event) = gilrs.next_event() {
+        // Just drain the event queue
+    }
+    
+    let gamepad_count = gilrs.gamepads().count();
+    eprintln!("Gilrs reports {} gamepads after event processing", gamepad_count);
     
     for (_id, gamepad) in gilrs.gamepads() {
         let name = gamepad.name().to_string();
@@ -796,13 +982,32 @@ pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
         eprintln!("  Is FF supported: {}", gamepad.is_ff_supported());
         eprintln!("  UUID: {:?}", gamepad.uuid());
         
+        // Gilrs doesn't provide a way to query exact button/axis counts before they're used
+        // Use reasonable defaults based on device type
+        let is_gamepad_device = is_gamepad(&name, &gamepad);
+        
+        let (button_count, axis_count, hat_count) = if is_gamepad_device {
+            // Standard gamepad: Xbox/PlayStation style
+            (15, 6, 1) // A/B/X/Y, LB/RB, LT/RT, Back/Start, LS/RS, D-pad (4 buttons) | Left stick X/Y, Right stick X/Y, Triggers | D-pad as hat
+        } else {
+            // Flight stick/HOTAS: More buttons, fewer axes
+            (32, 6, 1) // Many buttons typical on flight sticks | Fewer axes | Usually 1 hat switch
+        };
+        
+        eprintln!("  Estimated: {} buttons, {} axes, {} hats (type: {})", 
+                  button_count, axis_count, hat_count, 
+                  if is_gamepad_device { "gamepad" } else { "joystick" });
+        
+        let device_type_name = if is_gamepad_device { "Gamepad" } else { "Joystick" };
+        
         joysticks.push(JoystickInfo {
             id,
             name: name.clone(),
             is_connected,
-            button_count: 32, // gilrs doesn't provide exact count, estimate
-            axis_count: 8,     // gilrs doesn't provide exact count, estimate
-            hat_count: 1,      // Most devices have at least 1 hat
+            button_count,
+            axis_count,
+            hat_count,
+            device_type: device_type_name.to_string(),
         });
     }
     eprintln!("=== Total gamepads found: {} ===", joysticks.len());

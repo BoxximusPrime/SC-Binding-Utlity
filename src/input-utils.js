@@ -6,14 +6,14 @@ import { convertToSCAxisFormat, shouldInvertAxis, getAxisMapping } from './axis-
 
 /**
  * Parse a Star Citizen input string and return a friendly display name
- * @param {string} inputString - SC format like "js1_button3", "js1_hat1_up", "js2_axis1", "js2_axis1_positive"
+ * @param {string} inputString - SC format like "js1_button3", "gp1_button3", "js1_hat1_up", "js2_axis1", "js2_axis1_positive"
  * @returns {string} - Friendly name like "Button 3", "Hat 1 Up", "Axis 1", "Axis 1 +"
  */
 export function parseInputDisplayName(inputString)
 {
     if (!inputString) return '';
 
-    // Hat switch: js1_hat1_up -> "Hat 1 Up"
+    // Hat switch: js1_hat1_up or gp1_hat1_up -> "Hat 1 Up"
     if (inputString.includes('_hat'))
     {
         const hatMatch = inputString.match(/hat(\d+)_(\w+)/);
@@ -25,7 +25,7 @@ export function parseInputDisplayName(inputString)
         }
     }
 
-    // Button: js1_button3 -> "Button 3"
+    // Button: js1_button3 or gp1_button3 -> "Button 3"
     if (inputString.includes('_button'))
     {
         const btnMatch = inputString.match(/button(\d+)/);
@@ -35,8 +35,8 @@ export function parseInputDisplayName(inputString)
         }
     }
 
-    // Axis with direction: js1_axis1_positive -> "Axis 1 +"
-    // Axis without direction: js1_axis1 -> "Axis 1"
+    // Axis with direction: js1_axis1_positive or gp1_axis1_positive -> "Axis 1 +"
+    // Axis without direction: js1_axis1 or gp1_axis1 -> "Axis 1"
     if (inputString.includes('_axis'))
     {
         const axisMatch = inputString.match(/axis(\d+)(?:_(positive|negative))?/);
@@ -112,7 +112,7 @@ export function parseInputShortName(inputString)
 
 /**
  * Get the input type from a Star Citizen input string
- * @param {string} inputString - SC format like "js1_button3", "js1_hat1_up", "js2_axis1", "kb1_w"
+ * @param {string} inputString - SC format like "js1_button3", "gp1_button3", "js1_hat1_up", "js2_axis1", "kb1_w"
  * @returns {string} - Type: "button", "hat", "axis", "keyboard", or "unknown"
  */
 export function getInputType(inputString)
@@ -123,26 +123,28 @@ export function getInputType(inputString)
     if (inputString.includes('_button')) return 'button';
     if (inputString.includes('_axis')) return 'axis';
     if (inputString.startsWith('kb1_')) return 'keyboard';
+    if (inputString.startsWith('gp1_') || inputString.startsWith('js1_')) return 'gamepad'; // Both are game controllers
 
     return 'unknown';
 }
 
 /**
- * Get the joystick instance number from a Star Citizen input string
- * @param {string} inputString - SC format like "js1_button3", "js2_hat1_up"
- * @returns {number} - Joystick instance (1, 2, etc.) or 0 if not found
+ * Get the joystick/gamepad instance number from a Star Citizen input string
+ * @param {string} inputString - SC format like "js1_button3", "gp1_button3", "js2_hat1_up"
+ * @returns {number} - Device instance (1, 2, etc.) or 0 if not found
  */
 export function getJoystickInstance(inputString)
 {
     if (!inputString) return 0;
 
-    const match = inputString.match(/js(\d+)_/);
+    // Match both js and gp prefixes
+    const match = inputString.match(/(?:js|gp)(\d+)_/);
     return match ? parseInt(match[1]) : 0;
 }
 
 /**
  * Get the axis direction from a Star Citizen axis input string
- * @param {string} inputString - SC format like "js1_axis1_positive" or "js1_axis1_negative"
+ * @param {string} inputString - SC format like "js1_axis1_positive", "gp1_axis1_negative"
  * @returns {string|null} - "positive", "negative", or null if not an axis with direction
  */
 export function getAxisDirection(inputString)
@@ -155,7 +157,7 @@ export function getAxisDirection(inputString)
 
 /**
  * Get the axis number from a Star Citizen axis input string
- * @param {string} inputString - SC format like "js1_axis1" or "js1_axis1_positive"
+ * @param {string} inputString - SC format like "js1_axis1", "gp1_axis1", or "js1_axis1_positive"
  * @returns {number} - Axis number or 0 if not found
  */
 export function getAxisNumber(inputString)
@@ -201,7 +203,7 @@ export function processDetectedInput(result)
 
 /**
  * Convert any input string to Star Citizen format
- * For axes: converts "js1_axis3_positive" to "js1_z"
+ * For axes: converts "js1_axis3_positive" or "gp1_axis3_positive" to "js1_z" or "gp1_z"
  * For buttons/hats: returns unchanged
  * @param {string} inputString - Input string in any format
  * @returns {string} - Star Citizen compatible format
@@ -217,6 +219,6 @@ export function toStarCitizenFormat(inputString)
         return convertToSCAxisFormat(inputString, mapping);
     }
 
-    // Buttons and hats are already in correct format
+    // Buttons and hats are already in correct format (both js and gp prefixes are valid)
     return inputString;
 }

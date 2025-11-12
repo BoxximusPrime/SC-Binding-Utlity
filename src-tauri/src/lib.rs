@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 use tauri::Manager;
+use log::{info, error};
 
 mod keybindings;
 mod directinput;
@@ -705,9 +706,71 @@ fn write_binary_file(path: String, contents: Vec<u8>) -> Result<(), String> {
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
+#[tauri::command]
+fn log_error(message: String, stack: Option<String>) -> Result<(), String> {
+    if let Some(stack_trace) = stack {
+        error!("JavaScript Error: {}\nStack: {}", message, stack_trace);
+    } else {
+        error!("JavaScript Error: {}", message);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn log_info(message: String) -> Result<(), String> {
+    info!("{}", message);
+    Ok(())
+}
+
+#[tauri::command]
+fn get_log_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let log_dir = app_handle.path()
+        .app_log_dir()
+        .map_err(|e| format!("Failed to get log directory: {}", e))?;
+    
+    let log_file = log_dir.join("sc-joy-mapper.log");
+    Ok(log_file.to_string_lossy().to_string())
+}
+
+fn setup_logging(app_handle: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    
+    // Get log directory
+    let log_dir = app_handle.path().app_log_dir()?;
+    std::fs::create_dir_all(&log_dir)?;
+    
+    let log_file = log_dir.join("sc-joy-mapper.log");
+    
+    // Set up file logging with env_logger
+    let target = Box::new(OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file)?);
+    
+    env_logger::Builder::from_default_env()
+        .target(env_logger::Target::Pipe(target))
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "[{}] {} - {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                record.args()
+            )
+        })
+        .init();
+    
+    info!("=== SC Joy Mapper Started ===");
+    info!("Version: {}", env!("CARGO_PKG_VERSION"));
+    info!("Log file: {:?}", log_file);
+    
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(AppState::new()))
@@ -732,9 +795,24 @@ pub fn run() {
             scan_sc_installations,
             get_current_file_name,
             save_bindings_to_install,
-            write_binary_file
+            write_binary_file,
+            log_error,
+            log_info,
+            get_log_file_path
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .setup(|app| {
+            // Set up logging
+            if let Err(e) = setup_logging(app.handle()) {
+                eprintln!("Failed to set up logging: {}", e);
+            }
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                info!("=== SC Joy Mapper Shutting Down ===");
+            }
+        });
 }
 

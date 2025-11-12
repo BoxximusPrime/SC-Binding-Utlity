@@ -3,6 +3,51 @@ const { listen } = window.__TAURI__.event;
 const { open, save } = window.__TAURI__.dialog;
 import { toStarCitizenFormat } from './input-utils.js';
 
+// Global error handler for uncaught errors
+window.addEventListener('error', async (event) =>
+{
+  console.error('Uncaught error:', event.error);
+  try
+  {
+    await invoke('log_error', {
+      message: event.error?.message || event.message || 'Unknown error',
+      stack: event.error?.stack || null
+    });
+  } catch (e)
+  {
+    console.error('Failed to log error to backend:', e);
+  }
+});
+
+// Global handler for unhandled promise rejections
+window.addEventListener('unhandledrejection', async (event) =>
+{
+  console.error('Unhandled promise rejection:', event.reason);
+  try
+  {
+    await invoke('log_error', {
+      message: event.reason?.message || String(event.reason) || 'Unknown promise rejection',
+      stack: event.reason?.stack || null
+    });
+  } catch (e)
+  {
+    console.error('Failed to log promise rejection to backend:', e);
+  }
+});
+
+// Helper function to log info messages
+window.logInfo = async (message) =>
+{
+  console.log(message);
+  try
+  {
+    await invoke('log_info', { message });
+  } catch (e)
+  {
+    console.error('Failed to log info to backend:', e);
+  }
+};
+
 // Keyboard detection state
 let keyboardDetectionActive = false;
 let keyboardDetectionHandler = null;
@@ -2459,39 +2504,61 @@ function renderJoystickMappingList()
   // Load existing mapping from localStorage
   const existingMapping = JSON.parse(localStorage.getItem('joystickMapping') || '{}');
 
+  // Calculate instance numbers separately for joysticks and gamepads
+  let joystickInstanceNum = 0;
+  let gamepadInstanceNum = 0;
+
   container.innerHTML = detectedJoysticks.map(joystick =>
   {
     const physicalId = joystick.id;
-    const detectedScNum = physicalId + 1; // What SC will see it as (1-based)
-    const currentMapping = existingMapping[detectedScNum] || detectedScNum; // Default to detected number
+
+    // Use backend's device_type determination
+    const isGamepad = joystick.device_type === 'Gamepad';
+    const typeLabel = joystick.device_type;
+    const typeClass = isGamepad ? 'device-gamepad' : 'device-joystick';
+    const devicePrefix = isGamepad ? 'gp' : 'js';
+
+    // Assign instance number based on device type
+    let detectedScNum;
+    if (isGamepad)
+    {
+      gamepadInstanceNum++;
+      detectedScNum = gamepadInstanceNum;
+    } else
+    {
+      joystickInstanceNum++;
+      detectedScNum = joystickInstanceNum;
+    }
+
+    const currentMapping = existingMapping[`${devicePrefix}${detectedScNum}`] || detectedScNum; // Default to detected number
 
     return `
       <div class="joystick-mapping-item">
         <div class="joystick-info">
-          <div class="joystick-name">${joystick.name}</div>
-          <div class="joystick-details">
-            Currently detected as: <strong>js${detectedScNum}</strong> | 
-            Buttons: ${joystick.button_count} | 
-            Axes: ${joystick.axis_count} | 
-            Hats: ${joystick.hat_count}
+          <div class="joystick-name">
+            ${joystick.name}
+            <span class="device-badge ${typeClass.replace('device-', '')}">${typeLabel}</span>
           </div>
-          <div class="joystick-test-indicator" data-detected-sc-num="${detectedScNum}" id="test-indicator-${detectedScNum}">
+          <div class="joystick-details">
+            Currently detected as: <strong>${devicePrefix}${detectedScNum}</strong>
+          </div>
+          <div class="joystick-test-indicator" data-detected-sc-num="${detectedScNum}" data-device-prefix="${devicePrefix}" id="test-indicator-${devicePrefix}${detectedScNum}">
             Press a button on this device to identify it...
           </div>
         </div>
         <div class="joystick-mapping-controls">
           <label>Map to:</label>
-          <select data-detected-sc-num="${detectedScNum}" class="joystick-mapping-select">
-            <option value="1" ${currentMapping == 1 ? 'selected' : ''}>js1</option>
-            <option value="2" ${currentMapping == 2 ? 'selected' : ''}>js2</option>
-            <option value="3" ${currentMapping == 3 ? 'selected' : ''}>js3</option>
-            <option value="4" ${currentMapping == 4 ? 'selected' : ''}>js4</option>
+          <select data-detected-sc-num="${detectedScNum}" data-device-prefix="${devicePrefix}" class="joystick-mapping-select">
+            <option value="1" ${currentMapping == 1 ? 'selected' : ''}>${devicePrefix}1</option>
+            <option value="2" ${currentMapping == 2 ? 'selected' : ''}>${devicePrefix}2</option>
+            <option value="3" ${currentMapping == 3 ? 'selected' : ''}>${devicePrefix}3</option>
+            <option value="4" ${currentMapping == 4 ? 'selected' : ''}>${devicePrefix}4</option>
             <option value="disabled" ${currentMapping === 'disabled' ? 'selected' : ''}>Disabled</option>
           </select>
-          <span class="joystick-mapping-info" data-detected-sc-num="${detectedScNum}">
-            ${currentMapping === 'disabled' ? 'This device will be ignored' : `This device will be treated as js${currentMapping}`}
+          <span class="joystick-mapping-info" data-detected-sc-num="${detectedScNum}" data-device-prefix="${devicePrefix}">
+            ${currentMapping === 'disabled' ? 'This device will be ignored' : `This device will be treated as ${devicePrefix}${currentMapping}`}
           </span>
-          <button class="btn btn-small btn-secondary joystick-test-btn" data-detected-sc-num="${detectedScNum}">Test</button>
+          <button class="btn btn-small btn-secondary joystick-test-btn" data-detected-sc-num="${detectedScNum}" data-device-prefix="${devicePrefix}">Test</button>
         </div>
       </div>
     `;
@@ -2500,7 +2567,12 @@ function renderJoystickMappingList()
   // Add event listeners for test buttons
   document.querySelectorAll('.joystick-test-btn').forEach(btn =>
   {
-    btn.addEventListener('click', () => startJoystickTest(parseInt(btn.dataset.detectedScNum)));
+    btn.addEventListener('click', () => 
+    {
+      const detectedScNum = parseInt(btn.dataset.detectedScNum);
+      const devicePrefix = btn.dataset.devicePrefix;
+      startJoystickTest(detectedScNum, devicePrefix);
+    });
   });
 
   // Add event listeners for mapping select changes to update info text
@@ -2509,7 +2581,8 @@ function renderJoystickMappingList()
     select.addEventListener('change', (e) =>
     {
       const detectedScNum = e.target.dataset.detectedScNum;
-      const infoSpan = document.querySelector(`.joystick-mapping-info[data-detected-sc-num="${detectedScNum}"]`);
+      const devicePrefix = e.target.dataset.devicePrefix;
+      const infoSpan = document.querySelector(`.joystick-mapping-info[data-detected-sc-num="${detectedScNum}"][data-device-prefix="${devicePrefix}"]`);
       const value = e.target.value;
 
       if (infoSpan)
@@ -2520,7 +2593,7 @@ function renderJoystickMappingList()
         }
         else
         {
-          infoSpan.textContent = `This device will be treated as js${value}`;
+          infoSpan.textContent = `This device will be treated as ${devicePrefix}${value}`;
         }
       }
     });
@@ -2599,7 +2672,7 @@ function applyJoystickMapping(detectedInput)
 let testingJoystickNum = null;
 let testTimeout = null;
 
-async function startJoystickTest(detectedScNum)
+async function startJoystickTest(detectedScNum, devicePrefix)
 {
   if (testingJoystickNum !== null)
   {
@@ -2608,11 +2681,11 @@ async function startJoystickTest(detectedScNum)
     return;
   }
 
-  console.log(`Starting test for joystick ${detectedScNum}`);
+  console.log(`Starting test for ${devicePrefix}${detectedScNum}`);
   testingJoystickNum = detectedScNum;
 
-  const btn = document.querySelector(`.joystick-test-btn[data-detected-sc-num="${detectedScNum}"]`);
-  const indicator = document.getElementById(`test-indicator-${detectedScNum}`);
+  const btn = document.querySelector(`.joystick-test-btn[data-detected-sc-num="${detectedScNum}"][data-device-prefix="${devicePrefix}"]`);
+  const indicator = document.getElementById(`test-indicator-${devicePrefix}${detectedScNum}`);
 
   btn.textContent = 'Stop';
   btn.classList.add('active');
@@ -2621,27 +2694,39 @@ async function startJoystickTest(detectedScNum)
   // Start listening for input
   try
   {
-    const result = await invoke('wait_for_input_binding', { timeoutSecs: 10 });
+    const sessionId = 'keybinding-test-' + Date.now();
+    const result = await invoke('wait_for_input_binding', {
+      sessionId: sessionId,
+      timeoutSecs: 10
+    });
 
-    if (result && result.input_string.startsWith(`js${detectedScNum}_`))
+    if (result && result.input_string.startsWith(`${devicePrefix}${detectedScNum}_`))
     {
-      // Detected input from this joystick!
+      // Detected input from this device!
       indicator.textContent = `✅ Detected: ${result.display_name}`;
       indicator.classList.add('detected');
 
       // Reset after 2 seconds
       setTimeout(() =>
       {
-        stopJoystickTest();
+        stopJoystickTest(devicePrefix, detectedScNum);
       }, 2000);
     } else if (result)
     {
-      // Input detected but from wrong joystick
-      const detectedNum = result.input_string.match(/^js(\d+)_/)[1];
-      indicator.textContent = `❌ Detected input from js${detectedNum}, not js${detectedScNum}`;
+      // Input detected but from wrong device
+      const match = result.input_string.match(/^(gp|js)(\d+)_/);
+      if (match)
+      {
+        const detectedPrefix = match[1];
+        const detectedNum = match[2];
+        indicator.textContent = `❌ Detected input from ${detectedPrefix}${detectedNum}, not ${devicePrefix}${detectedScNum}`;
+      } else
+      {
+        indicator.textContent = `❌ Detected input from different device`;
+      }
       setTimeout(() =>
       {
-        stopJoystickTest();
+        stopJoystickTest(devicePrefix, detectedScNum);
       }, 2000);
     } else
     {
@@ -2649,7 +2734,7 @@ async function startJoystickTest(detectedScNum)
       indicator.textContent = `⏱️ No input detected`;
       setTimeout(() =>
       {
-        stopJoystickTest();
+        stopJoystickTest(devicePrefix, detectedScNum);
       }, 1500);
     }
   } catch (error)
@@ -2658,23 +2743,35 @@ async function startJoystickTest(detectedScNum)
     indicator.textContent = `❌ Error: ${error}`;
     setTimeout(() =>
     {
-      stopJoystickTest();
+      stopJoystickTest(devicePrefix, detectedScNum);
     }, 2000);
   }
 }
 
-function stopJoystickTest()
+function stopJoystickTest(devicePrefix = null, detectedScNum = null)
 {
   if (testingJoystickNum === null) return;
 
-  const detectedScNum = testingJoystickNum;
-  const btn = document.querySelector(`.joystick-test-btn[data-detected-sc-num="${detectedScNum}"]`);
-  const indicator = document.getElementById(`test-indicator-${detectedScNum}`);
+  if (!devicePrefix || !detectedScNum)
+  {
+    // If not provided, find from testingJoystickNum (for backwards compatibility)
+    detectedScNum = testingJoystickNum;
+    devicePrefix = 'js'; // Default
+  }
 
-  btn.textContent = 'Test';
-  btn.classList.remove('active');
-  indicator.classList.remove('detected');
-  indicator.textContent = 'Press a button on this device to identify it...';
+  const btn = document.querySelector(`.joystick-test-btn[data-detected-sc-num="${detectedScNum}"][data-device-prefix="${devicePrefix}"]`);
+  const indicator = document.getElementById(`test-indicator-${devicePrefix}${detectedScNum}`);
+
+  if (btn)
+  {
+    btn.textContent = 'Test';
+    btn.classList.remove('active');
+  }
+  if (indicator)
+  {
+    indicator.classList.remove('detected');
+    indicator.textContent = 'Press a button on this device to identify it...';
+  }
 
   testingJoystickNum = null;
 
@@ -2875,5 +2972,44 @@ async function fallbackResetBinding()
   } catch (error)
   {
     console.error('Failed to load app version:', error);
+  }
+})();
+
+// =====================
+// INITIALIZE LOG FILE PATH
+// =====================
+(async () =>
+{
+  try
+  {
+    const logPath = await invoke('get_log_file_path');
+    const logPathElement = document.getElementById('debug-log-path');
+
+    if (logPathElement)
+    {
+      logPathElement.title = `Log file: ${logPath}\nClick to copy path`;
+      logPathElement.addEventListener('click', async () =>
+      {
+        try
+        {
+          await navigator.clipboard.writeText(logPath);
+          const originalText = logPathElement.textContent;
+          logPathElement.textContent = '✓ Copied!';
+          setTimeout(() =>
+          {
+            logPathElement.textContent = originalText;
+          }, 2000);
+        } catch (e)
+        {
+          console.error('Failed to copy to clipboard:', e);
+          alert(`Log file path:\n${logPath}`);
+        }
+      });
+
+      await logInfo(`Application started - version ${await invoke('get_app_version')}`);
+    }
+  } catch (error)
+  {
+    console.error('Failed to get log file path:', error);
   }
 })();

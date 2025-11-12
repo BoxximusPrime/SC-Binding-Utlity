@@ -368,6 +368,7 @@
               <button id="start-debug-btn" class="btn btn-primary">▶ Start Detecting</button>
               <button id="stop-debug-btn" class="btn btn-secondary" disabled>⏸ Stop Detecting</button>
               <button id="clear-debug-btn" class="btn btn-secondary">🗑️ Clear Log</button>
+              <button id="show-devices-btn" class="btn btn-secondary">🎮 Show Devices</button>
               <span id="debug-status" class="status-indicator">Ready</span>
             </div>
 
@@ -459,7 +460,6 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>Configure Joystick Mapping</h2>
-        <button class="modal-close" id="joystick-mapping-close">&times;</button>
       </div>
       <div class="modal-body">
         <p class="mapping-help">Map your physical joysticks to Star Citizen joystick numbers. This is useful when
@@ -472,6 +472,24 @@
         <button id="joystick-mapping-detect" class="btn btn-primary">🔄 Detect Joysticks</button>
         <button id="joystick-mapping-save" class="btn btn-primary">Save Mapping</button>
         <button id="joystick-mapping-cancel" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Device List Modal (for Input Debugger) -->
+  <div id="device-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Connected Devices</h2>
+        <button class="modal-close" id="close-modal-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="device-modal-list" class="device-list">
+          <!-- Device cards will be populated here -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="close-device-modal-footer" class="btn btn-secondary">Close</button>
       </div>
     </div>
   </div>
@@ -584,7 +602,6 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>Configure Joystick Mapping for Template</h2>
-        <button class="modal-close" id="template-joystick-mapping-close">&times;</button>
       </div>
       <div class="modal-body">
         <p class="mapping-help">Map your physical joysticks to the left stick (js1) and right stick (js2) for this
@@ -621,6 +638,13 @@
   <input type="file" id="image-file-input" accept="image/*" style="display: none;" />
   <input type="file" id="template-file-input" accept=".json" style="display: none;" />
   <input type="file" id="export-keybindings-input" style="display: none;" />
+
+  <!-- Debug Info Footer -->
+  <div id="debug-info"
+    style="position: fixed; bottom: 0; right: 0; padding: 5px 10px; background: rgba(0,0,0,0.7); color: #888; font-size: 10px; border-top-left-radius: 4px; z-index: 10000;">
+    <span id="debug-log-path" style="cursor: pointer; text-decoration: underline;"
+      title="Click to copy log file path">Logs</span>
+  </div>
 </body>
 
 </html>

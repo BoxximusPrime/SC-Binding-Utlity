@@ -1,6 +1,26 @@
-const { invoke } = window.__TAURI__.core;
-const { open, save } = window.__TAURI__.dialog;
-import { parseInputDisplayName, parseInputShortName, getInputType } from './input-utils.js';
+// Safely access TAURI APIs
+let invoke, open, save;
+
+if (window.__TAURI__)
+{
+    invoke = window.__TAURI__.core.invoke;
+    ({ open, save } = window.__TAURI__.dialog);
+}
+
+// Lazy imports - will be loaded when needed
+let parseInputDisplayName, parseInputShortName, getInputType;
+
+// Load utilities when template editor initializes
+async function loadUtilities()
+{
+    if (!parseInputDisplayName)
+    {
+        const utils = await import('./input-utils.js');
+        parseInputDisplayName = utils.parseInputDisplayName;
+        parseInputShortName = utils.parseInputShortName;
+        getInputType = utils.getInputType;
+    }
+}
 
 // State
 let templateData = {
@@ -49,6 +69,9 @@ let hasUnsavedChanges = false;
 window.initializeTemplateEditor = function ()
 {
     if (canvas) return; // Already initialized
+
+    // Load utilities first
+    loadUtilities();
 
     canvas = document.getElementById('editor-canvas');
     ctx = canvas.getContext('2d');
@@ -2808,10 +2831,13 @@ function renderTemplateJoystickMappingList()
         return;
     }
 
+    // Calculate instance numbers separately for joysticks and gamepads
+    let joystickInstanceNum = 0;
+    let gamepadInstanceNum = 0;
+
     container.innerHTML = detectedTemplateJoysticks.map((joystick, index) =>
     {
         const physicalId = joystick.id;
-        const detectedScNum = physicalId + 1; // What SC will see it as (1-based)
 
         // Check current mapping
         const leftStickMapping = templateData.leftStick?.physicalJoystickId;
@@ -2821,17 +2847,35 @@ function renderTemplateJoystickMappingList()
         if (leftStickMapping === physicalId) currentRole = 'left';
         else if (rightStickMapping === physicalId) currentRole = 'right';
 
+        // Use backend's device_type determination
+        const isGamepad = joystick.device_type === 'Gamepad';
+        const typeLabel = joystick.device_type;
+        const typeClass = isGamepad ? 'device-gamepad' : 'device-joystick';
+        const devicePrefix = isGamepad ? 'gp' : 'js';
+
+        // Assign instance number based on device type
+        let detectedScNum;
+        if (isGamepad)
+        {
+            gamepadInstanceNum++;
+            detectedScNum = gamepadInstanceNum;
+        } else
+        {
+            joystickInstanceNum++;
+            detectedScNum = joystickInstanceNum;
+        }
+
         return `
             <div class="joystick-mapping-item">
                 <div class="joystick-info">
-                    <div class="joystick-name">${joystick.name}</div>
-                    <div class="joystick-details">
-                        Currently detected as: <strong>js${detectedScNum}</strong> | 
-                        Buttons: ${joystick.button_count} | 
-                        Axes: ${joystick.axis_count} | 
-                        Hats: ${joystick.hat_count}
+                    <div class="joystick-name">
+                        ${joystick.name}
+                        <span class="device-badge ${typeClass.replace('device-', '')}">${typeLabel}</span>
                     </div>
-                    <div class="joystick-test-indicator" data-physical-id="${physicalId}" id="template-test-indicator-${physicalId}">
+                    <div class="joystick-details">
+                        Currently detected as: <strong>${devicePrefix}${detectedScNum}</strong>
+                    </div>
+                    <div class="joystick-test-indicator" data-physical-id="${physicalId}" data-device-prefix="${devicePrefix}" id="template-test-indicator-${devicePrefix}${detectedScNum}">
                         Press a button on this device to identify it...
                     </div>
                 </div>
@@ -2839,10 +2883,10 @@ function renderTemplateJoystickMappingList()
                     <label>Assign to:</label>
                     <select data-physical-id="${physicalId}" class="template-joystick-role-select">
                         <option value="none" ${currentRole === 'none' ? 'selected' : ''}>Not Used</option>
-                        <option value="left" ${currentRole === 'left' ? 'selected' : ''}>JS1</option>
-                        <option value="right" ${currentRole === 'right' ? 'selected' : ''}>JS2</option>
+                        <option value="left" ${currentRole === 'left' ? 'selected' : ''}>Left Stick</option>
+                        <option value="right" ${currentRole === 'right' ? 'selected' : ''}>Right Stick</option>
                     </select>
-                    <button class="btn btn-small btn-secondary template-joystick-test-btn" data-physical-id="${physicalId}" data-detected-sc-num="${detectedScNum}">Test</button>
+                    <button class="btn btn-small btn-secondary template-joystick-test-btn" data-physical-id="${physicalId}" data-detected-sc-num="${detectedScNum}" data-device-prefix="${devicePrefix}">Test</button>
                 </div>
             </div>
         `;
@@ -2855,12 +2899,13 @@ function renderTemplateJoystickMappingList()
         {
             const physicalId = parseInt(btn.dataset.physicalId);
             const detectedScNum = parseInt(btn.dataset.detectedScNum);
-            startTemplateJoystickTest(physicalId, detectedScNum);
+            const devicePrefix = btn.dataset.devicePrefix;
+            startTemplateJoystickTest(physicalId, detectedScNum, devicePrefix);
         });
     });
 }
 
-async function startTemplateJoystickTest(physicalId, detectedScNum)
+async function startTemplateJoystickTest(physicalId, detectedScNum, devicePrefix)
 {
     if (testingTemplateJoystickNum !== null)
     {
@@ -2869,15 +2914,15 @@ async function startTemplateJoystickTest(physicalId, detectedScNum)
         return;
     }
 
-    console.log(`Starting test for template joystick ${detectedScNum} (physical ID: ${physicalId})`);
+    console.log(`Starting test for template ${devicePrefix}${detectedScNum} (physical ID: ${physicalId})`);
     testingTemplateJoystickNum = detectedScNum;
 
-    const indicator = document.getElementById(`template-test-indicator-${physicalId}`);
-    const btn = document.querySelector(`.template-joystick-test-btn[data-physical-id="${physicalId}"]`);
+    const indicator = document.getElementById(`template-test-indicator-${devicePrefix}${detectedScNum}`);
+    const btn = document.querySelector(`.template-joystick-test-btn[data-physical-id="${physicalId}"][data-device-prefix="${devicePrefix}"]`);
 
     if (indicator)
     {
-        indicator.textContent = 'Waiting for input...';
+        indicator.textContent = '👂 Listening for input... Press any button!';
         indicator.style.color = '#ffc107';
     }
     if (btn)
@@ -2888,8 +2933,8 @@ async function startTemplateJoystickTest(physicalId, detectedScNum)
 
     try
     {
-        // Wait for input from this specific joystick
-        const sessionId = 'verify-session-' + Date.now();
+        // Wait for input from this specific device
+        const sessionId = 'template-test-' + Date.now();
         const result = await invoke('wait_for_input_binding', {
             sessionId: sessionId,
             timeoutSecs: 10
@@ -2897,17 +2942,18 @@ async function startTemplateJoystickTest(physicalId, detectedScNum)
 
         if (result)
         {
-            // Check if the input came from the expected joystick
-            const match = result.input_string.match(/^js(\d+)_/);
+            // Check if the input came from the expected device
+            const match = result.input_string.match(/^(gp|js)(\d+)_/);
             if (match)
             {
-                const inputJsNum = parseInt(match[1]);
+                const inputPrefix = match[1];
+                const inputNum = parseInt(match[2]);
 
-                if (inputJsNum === detectedScNum)
+                if (inputPrefix === devicePrefix && inputNum === detectedScNum)
                 {
                     if (indicator)
                     {
-                        indicator.textContent = `✓ Detected input: ${result.display_name}`;
+                        indicator.textContent = `✅ Detected: ${result.display_name}`;
                         indicator.style.color = '#5cb85c';
                     }
                 }
@@ -2915,7 +2961,7 @@ async function startTemplateJoystickTest(physicalId, detectedScNum)
                 {
                     if (indicator)
                     {
-                        indicator.textContent = `⚠ Input from different joystick (js${inputJsNum})`;
+                        indicator.textContent = `❌ Input from ${inputPrefix}${inputNum}, not ${devicePrefix}${detectedScNum}`;
                         indicator.style.color = '#d9534f';
                     }
                 }
@@ -2925,8 +2971,8 @@ async function startTemplateJoystickTest(physicalId, detectedScNum)
         {
             if (indicator)
             {
-                indicator.textContent = 'Timeout - no input detected';
-                indicator.style.color = '#999';
+                indicator.textContent = `⏱️ No input detected (timeout)`;
+                indicator.style.color = '#d9534f';
             }
         }
     }
@@ -2935,27 +2981,17 @@ async function startTemplateJoystickTest(physicalId, detectedScNum)
         console.error('Error during template joystick test:', error);
         if (indicator)
         {
-            indicator.textContent = `Error: ${error}`;
+            indicator.textContent = `❌ Error: ${error.message || error}`;
             indicator.style.color = '#d9534f';
         }
     }
     finally
     {
-        // Reset UI after a delay
+        // Reset button after 2 seconds
         setTimeout(() =>
         {
-            if (indicator)
-            {
-                indicator.textContent = 'Press a button on this device to identify it...';
-                indicator.style.color = '';
-            }
-            if (btn)
-            {
-                btn.textContent = 'Test';
-                btn.classList.remove('btn-warning');
-            }
-            testingTemplateJoystickNum = null;
-        }, 3000);
+            stopTemplateJoystickTest();
+        }, 2000);
     }
 }
 
@@ -3089,4 +3125,3 @@ function updateStickMappingDisplay()
         }
     }
 }
-

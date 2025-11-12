@@ -27,6 +27,9 @@ quick-xml = { version = "0.36", features = ["serialize"] }
 gilrs = { version = "0.11", features = ["wgi"] }
 rusty-xinput = "1.3"
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+env_logger = "0.11"
+log = "0.4"
+chrono = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_UI_Input_KeyboardAndMouse"] }

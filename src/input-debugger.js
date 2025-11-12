@@ -10,8 +10,9 @@ let uniqueHats = new Set();
 let uniqueKeys = new Set();
 
 // DOM element references (will be set during initialization)
-let startBtn, stopBtn, clearBtn, statusIndicator, timeline, eventCountSpan, autoScrollCheckbox;
+let startBtn, stopBtn, clearBtn, showDevicesBtn, statusIndicator, timeline, eventCountSpan, autoScrollCheckbox;
 let statTotal, statButtons, statAxes, statHats, statKeys;
+let deviceModal, closeModalBtn, deviceList;
 
 // Define all functions first, before initializeDebugger
 
@@ -338,6 +339,81 @@ function handleKeyboardInput(event)
     });
 }
 
+// Helper function to determine if a device is a gamepad
+function isGamepad(deviceName)
+{
+    const gamepadPatterns = ['xbox', 'controller', 'gamepad'];
+    return gamepadPatterns.some(pattern => deviceName.toLowerCase().includes(pattern));
+}
+
+// Show device modal with list of connected devices
+async function showDevices()
+{
+    try
+    {
+        const devices = await invoke('detect_joysticks');
+
+        console.log('Detected devices:', devices); // Debug log
+
+        deviceList.innerHTML = '';
+
+        if (!devices || devices.length === 0)
+        {
+            deviceList.innerHTML = '<div style="padding: 1rem; text-align: center; color: #888;">No devices detected</div>';
+        } else
+        {
+            console.log('Building device cards for', devices.length, 'devices');
+
+            devices.forEach((device, index) =>
+            {
+                const isGp = device.device_type === 'Gamepad';
+                const typeLabel = device.device_type;
+                const typeClass = isGp ? 'gamepad' : 'joystick';
+                // Use index + 1 for the SC instance ID (SC uses 1-based indexing)
+                const deviceId = isGp ? `gp${index + 1}` : `js${index + 1}`;
+
+                console.log(`Device ${index}: ${device.name} -> ${deviceId} (${typeLabel})`);
+
+                const deviceCard = document.createElement('div');
+                deviceCard.className = `device-card device-${typeClass}`;
+                deviceCard.innerHTML = `
+                    <div class="device-header">
+                        <div class="device-name">${device.name}</div>
+                        <span class="device-badge ${typeClass}">${typeLabel}</span>
+                    </div>
+                    <div class="device-details">
+                        <div class="device-detail-row">
+                            <span class="label">SC Instance:</span>
+                            <code>${deviceId}</code>
+                        </div>
+                    </div>
+                    <div class="device-status">${device.is_connected ? 'Connected' : 'Disconnected'}</div>
+                `;
+
+                deviceList.appendChild(deviceCard);
+                console.log('Appended device card to list');
+            });
+
+            console.log('Final deviceList innerHTML length:', deviceList.innerHTML.length);
+        }
+
+        console.log('Setting modal display to flex');
+        deviceModal.style.display = 'flex';
+        console.log('Modal display style:', window.getComputedStyle(deviceModal).display);
+    } catch (error)
+    {
+        console.error('Error fetching devices:', error);
+        deviceList.innerHTML = '<div style="padding: 1rem; color: #f44;">Error loading devices</div>';
+        deviceModal.style.display = 'flex';
+    }
+}
+
+// Close device modal
+function closeDeviceModal()
+{
+    deviceModal.style.display = 'none';
+}
+
 // Initialize debugger when tab is opened
 window.initializeDebugger = function ()
 {
@@ -348,10 +424,19 @@ window.initializeDebugger = function ()
     startBtn = document.getElementById('start-debug-btn');
     stopBtn = document.getElementById('stop-debug-btn');
     clearBtn = document.getElementById('clear-debug-btn');
+    showDevicesBtn = document.getElementById('show-devices-btn');
     statusIndicator = document.getElementById('debug-status');
     timeline = document.getElementById('timeline');
     eventCountSpan = document.getElementById('event-count');
     autoScrollCheckbox = document.getElementById('auto-scroll-checkbox');
+
+    // Modal elements
+    deviceModal = document.getElementById('device-modal');
+    closeModalBtn = document.getElementById('close-modal-btn');
+    const closeModalFooterBtn = document.getElementById('close-device-modal-footer');
+    deviceList = document.getElementById('device-modal-list');
+
+    console.log('Device modal elements:', { deviceModal, closeModalBtn, closeModalFooterBtn, deviceList });
 
     // Stats elements
     statTotal = document.getElementById('stat-total');
@@ -364,6 +449,18 @@ window.initializeDebugger = function ()
     startBtn.addEventListener('click', startDetecting);
     stopBtn.addEventListener('click', stopDetecting);
     clearBtn.addEventListener('click', clearLog);
+    showDevicesBtn.addEventListener('click', showDevices);
+    if (closeModalBtn) closeModalBtn.addEventListener('click', closeDeviceModal);
+    if (closeModalFooterBtn) closeModalFooterBtn.addEventListener('click', closeDeviceModal);
+
+    // Close modal when clicking outside
+    deviceModal.addEventListener('click', (e) =>
+    {
+        if (e.target === deviceModal)
+        {
+            closeDeviceModal();
+        }
+    });
 
     // Keyboard event listener (capture phase to catch before browser defaults)
     document.addEventListener('keydown', handleKeyboardInput, true);
