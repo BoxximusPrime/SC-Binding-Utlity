@@ -1311,15 +1311,22 @@ function onCanvasWheel(event)
 
 function onCanvasDoubleClick(event)
 {
-    if (!loadedImage || mode !== 'view') return;
+    // Allow editing even if no image is loaded, as long as we are in view mode
+    if (mode !== 'view') return;
 
     const coords = getCanvasCoords(event);
+    console.log('Double click at', coords);
 
     // Check if double-clicking on a button
     const button = findButtonAtPosition(coords);
     if (button)
     {
+        console.log('Found button', button.id);
         editButtonFromList(button.id);
+    }
+    else
+    {
+        console.log('No button found at position');
     }
 }
 
@@ -1371,8 +1378,9 @@ function findHandleAtPosition(pos)
             else
             {
                 // For simple buttons, check the single label box
-                const labelWidth = ButtonFrameWidth / zoom;
-                const labelHeight = ButtonFrameHeight / zoom;
+                // Use world coordinates (don't divide by zoom)
+                const labelWidth = ButtonFrameWidth;
+                const labelHeight = ButtonFrameHeight;
                 const x = button.labelPos.x - labelWidth / 2;
                 const y = button.labelPos.y - labelHeight / 2;
 
@@ -1408,15 +1416,40 @@ function findButtonAtPosition(pos)
         // Check if clicking on label box
         if (button.labelPos)
         {
-            const labelWidth = HatFrameWidth;
-            const labelHeight = HatFrameHeight;
-            const x = button.labelPos.x - labelWidth / 2;
-            const y = button.labelPos.y - labelHeight / 2;
-
-            if (pos.x >= x && pos.x <= x + labelWidth &&
-                pos.y >= y && pos.y <= y + labelHeight)
+            if (button.buttonType === 'hat4way')
             {
-                return button;
+                const hasPush = button.inputs && button.inputs['push'];
+                const directions = ['up', 'down', 'left', 'right', 'push'];
+
+                for (const dir of directions)
+                {
+                    // Only check directions that have inputs
+                    if (!button.inputs || !button.inputs[dir])
+                    {
+                        continue;
+                    }
+
+                    const bounds = getHat4WayBoxBounds(dir, button.labelPos.x, button.labelPos.y, hasPush);
+                    if (bounds &&
+                        pos.x >= bounds.x && pos.x <= bounds.x + bounds.width &&
+                        pos.y >= bounds.y && pos.y <= bounds.y + bounds.height)
+                    {
+                        return button;
+                    }
+                }
+            }
+            else
+            {
+                const labelWidth = ButtonFrameWidth;
+                const labelHeight = ButtonFrameHeight;
+                const x = button.labelPos.x - labelWidth / 2;
+                const y = button.labelPos.y - labelHeight / 2;
+
+                if (pos.x >= x && pos.x <= x + labelWidth &&
+                    pos.y >= y && pos.y <= y + labelHeight)
+                {
+                    return button;
+                }
             }
         }
     }

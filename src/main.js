@@ -73,11 +73,114 @@ let currentTab = 'main';
 let categoryFriendlyNames = {};
 let currentFilename = null; // Track the current file name for the copy command
 const SECONDARY_WINDOW_MS = 1000; // One-second window for multi-input capture
+let deviceAxisNames = {}; // Cache of device_name -> { axis_id -> axis_name } from HID descriptors
 
 function setBindingSaveEnabled(enabled)
 {
   if (!bindingModalSaveBtn) return;
   bindingModalSaveBtn.disabled = !enabled;
+}
+
+/**
+ * Load axis names for all connected devices from HID descriptors
+ * This populates the deviceAxisNames cache used for display
+ */
+async function loadDeviceAxisNames()
+{
+  try
+  {
+    if (!currentKeybindings || !currentKeybindings.devices) return;
+
+    // Collect all unique device names from joysticks
+    const deviceNames = new Set();
+
+    if (currentKeybindings.devices.joysticks)
+    {
+      currentKeybindings.devices.joysticks.forEach(js => deviceNames.add(js.device_name));
+    }
+
+    if (currentKeybindings.devices.gamepads)
+    {
+      currentKeybindings.devices.gamepads.forEach(gp => deviceNames.add(gp.device_name));
+    }
+
+    // Load axis names for each device
+    for (const deviceName of deviceNames)
+    {
+      if (!deviceAxisNames[deviceName])
+      {
+        try
+        {
+          const axisNames = await invoke('get_axis_names_for_device', { deviceName });
+          deviceAxisNames[deviceName] = axisNames || {};
+          console.log(`[Axis Names] Loaded ${Object.keys(axisNames || {}).length} axes for device: ${deviceName}`);
+        } catch (error)
+        {
+          console.warn(`[Axis Names] Failed to load axis names for ${deviceName}:`, error);
+          deviceAxisNames[deviceName] = {}; // Cache empty result to avoid repeated attempts
+        }
+      }
+    }
+  } catch (error)
+  {
+    console.error('[Axis Names] Failed to load device axis names:', error);
+  }
+}
+
+/**
+ * Get the HID axis name for a joystick axis binding
+ * @param {string} binding - The binding string (e.g., "js1_x", "js2_ry")
+ * @returns {string|null} - The HID axis name (e.g., "X", "Ry") or null if not found
+ */
+function getHidAxisNameForBinding(binding)
+{
+  if (!binding || !currentKeybindings || !currentKeybindings.devices) return null;
+
+  // Parse binding format: jsX_axis or gpX_axis
+  const match = binding.match(/^(js|gp)(\d+)_([a-z0-9_]+)$/i);
+  if (!match) return null;
+
+  const [, deviceType, deviceNum, axisName] = match;
+
+  // Map deviceType and number to actual device name
+  let device = null;
+
+  if (deviceType.toLowerCase() === 'js')
+  {
+    const jsNum = parseInt(deviceNum);
+    if (currentKeybindings.devices.joysticks && currentKeybindings.devices.joysticks[jsNum - 1])
+    {
+      device = currentKeybindings.devices.joysticks[jsNum - 1];
+    }
+  } else if (deviceType.toLowerCase() === 'gp')
+  {
+    const gpNum = parseInt(deviceNum);
+    if (currentKeybindings.devices.gamepads && currentKeybindings.devices.gamepads[gpNum - 1])
+    {
+      device = currentKeybindings.devices.gamepads[gpNum - 1];
+    }
+  }
+
+  if (!device || !device.device_name) return null;
+
+  // Get axis names for this device
+  const axisMap = deviceAxisNames[device.device_name];
+  if (!axisMap) return null;
+
+  // Map the axis letter to axis index
+  // Common mappings: x=1, y=2, z=3, rx=4, ry=5, rz=6, slider=7, slider2=8, hat=9
+  const axisIndexMap = {
+    'x': 1, 'y': 2, 'z': 3,
+    'rx': 4, 'ry': 5, 'rz': 6,
+    'rotx': 4, 'roty': 5, 'rotz': 6,
+    'slider': 7, 'slider1': 7, 'slider2': 8,
+    'hat': 9, 'hat_switch': 9
+  };
+
+  const axisIndex = axisIndexMap[axisName.toLowerCase()];
+  if (axisIndex === undefined) return null;
+
+  return axisMap[axisIndex] || null;
 }
 
 // Convert JavaScript KeyboardEvent.code to Star Citizen keyboard format
@@ -674,7 +777,7 @@ function switchTab(tabName)
   });
 
   // Update body class for CSS selectors to show/hide template info
-  document.body.classList.remove('tab-welcome', 'tab-main', 'tab-visual', 'tab-template', 'tab-debugger', 'tab-help', 'tab-settings');
+  document.body.classList.remove('tab-welcome', 'tab-main', 'tab-visual', 'tab-template', 'tab-debugger', 'tab-character', 'tab-help', 'tab-settings');
   document.body.classList.add(`tab-${tabName}`);
 
   // Save to localStorage
@@ -700,6 +803,14 @@ function switchTab(tabName)
     if (window.initializeTemplateEditor)
     {
       window.initializeTemplateEditor();
+    }
+  }
+  else if (tabName === 'character')
+  {
+    // Initialize character manager if needed
+    if (window.initCharacterManager)
+    {
+      window.initCharacterManager();
     }
   }
   else if (tabName === 'debugger')
@@ -758,6 +869,27 @@ function initializeEventListeners()
       }
     }, 50);
   });
+
+  // Debugger view switchers
+  const switchToBasicDebug = document.getElementById('switch-to-basic-debug');
+  const switchToHIDDebug = document.getElementById('switch-to-hid-debug');
+  if (switchToBasicDebug && switchToHIDDebug)
+  {
+    switchToBasicDebug.addEventListener('click', () =>
+    {
+      document.getElementById('basic-debugger-view').style.display = 'block';
+      document.getElementById('hid-debugger-view').style.display = 'none';
+      switchToBasicDebug.classList.add('active');
+      switchToHIDDebug.classList.remove('active');
+    });
+    switchToHIDDebug.addEventListener('click', () =>
+    {
+      document.getElementById('basic-debugger-view').style.display = 'none';
+      document.getElementById('hid-debugger-view').style.display = 'block';
+      switchToBasicDebug.classList.remove('active');
+      switchToHIDDebug.classList.add('active');
+    });
+  }
 
   // Filter buttons
   const filterBtns = document.querySelectorAll('.filter-section .category-item');
@@ -1533,6 +1665,9 @@ function displayKeybindings()
   // Update copy command button visibility
   updateCopyCommandButtonVisibility();
 
+  // Load axis names from HID descriptors for display
+  loadDeviceAxisNames();
+
   // Render categories
   renderCategories();
 
@@ -1974,6 +2109,10 @@ function renderKeybindings()
           // display_name already contains the formatted original binding text for cleared bindings
           const clearedDisplayText = isClearedBinding ? binding.display_name : displayText;
 
+          // Try to get HID axis name for joystick/gamepad axis bindings
+          const hidAxisName = getHidAxisNameForBinding(binding.input);
+          const axisHint = hidAxisName ? ` <span class="hid-axis-hint" title="Hardware axis: ${hidAxisName}">[${hidAxisName}]</span>` : '';
+
           // Only show remove button for non-unbound bindings
           const removeButton = typeClass !== 'unbound' ? `
               <button class="binding-remove-btn" 
@@ -1986,7 +2125,7 @@ function renderKeybindings()
             <span class="binding-tag ${typeClass} ${binding.is_default ? 'default-binding' : ''} ${isClearedBinding ? 'cleared-binding' : ''}">
               <span class="binding-icon">${icon}</span>
               <span class="binding-label ${isClearedBinding ? 'cleared-text' : ''}">
-                ${isClearedBinding ? `<span class="cleared-default-text">${clearedDisplayText}</span>` : displayText}
+                ${isClearedBinding ? `<span class="cleared-default-text">${clearedDisplayText}</span>` : displayText}${axisHint}
               </span>
               ${defaultIndicator}${multiTapIndicator}${removeButton}
             </span>

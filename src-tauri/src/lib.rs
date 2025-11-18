@@ -8,6 +8,7 @@ mod device_database;
 mod device_profiles;
 mod directinput;
 mod keybindings;
+mod hid_reader;
 
 use keybindings::{Action, ActionMap, ActionMaps, AllBinds, MergedBindings, OrganizedKeybindings};
 
@@ -35,6 +36,15 @@ struct ConflictingBinding {
 struct ScInstallation {
     name: String,
     path: String,
+}
+
+// Struct for character file information
+#[derive(serde::Serialize, Clone)]
+struct CharacterFile {
+    name: String,
+    path: String,
+    size: u64,
+    modified: u64, // Unix timestamp in seconds
 }
 
 // Global state to hold the current keybindings
@@ -92,6 +102,9 @@ fn detect_axis_movement(
 }
 
 #[tauri::command]
+/// DEPRECATED: Use get_axis_names_for_device() instead
+/// This function returns hardcoded axis profiles from device-database.json
+/// For accurate axis detection, use the HID descriptor parsing functions
 fn get_axis_profiles() -> HashMap<String, HashMap<String, u32>> {
     device_profiles::profiles_snapshot()
 }
@@ -1191,6 +1204,243 @@ fn remove_unbind_profile() -> Result<RemoveUnbindResult, String> {
     Ok(RemoveUnbindResult { removed_count })
 }
 
+#[tauri::command]
+fn scan_character_files(directory_path: String) -> Result<Vec<CharacterFile>, String> {
+    use std::fs;
+    use std::time::UNIX_EPOCH;
+
+    let dir_path = std::path::Path::new(&directory_path);
+
+    // Check if directory exists
+    if !dir_path.exists() {
+        // Return empty list instead of error if directory doesn't exist
+        return Ok(Vec::new());
+    }
+
+    if !dir_path.is_dir() {
+        return Err("Path is not a directory".to_string());
+    }
+
+    let mut characters = Vec::new();
+
+    // Read directory entries
+    let entries = fs::read_dir(dir_path)
+        .map_err(|e| format!("Failed to read directory: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let path = entry.path();
+
+        // Only process .chf files
+        if path.is_file() {
+            if let Some(ext) = path.extension() {
+                if ext == "chf" {
+                    if let Some(file_name) = path.file_name() {
+                        if let Some(name_str) = file_name.to_str() {
+                            // Get file metadata
+                            let metadata = fs::metadata(&path)
+                                .map_err(|e| format!("Failed to read metadata: {}", e))?;
+
+                            let size = metadata.len();
+                            let modified = metadata
+                                .modified()
+                                .map_err(|e| format!("Failed to get modified time: {}", e))?
+                                .duration_since(UNIX_EPOCH)
+                                .map_err(|e| format!("Time error: {}", e))?
+                                .as_secs();
+
+                            characters.push(CharacterFile {
+                                name: name_str.to_string(),
+                                path: path.to_string_lossy().to_string(),
+                                size,
+                                modified,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by name
+    characters.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(characters)
+}
+
+#[tauri::command]
+fn deploy_character_to_installation(
+    character_name: String,
+    library_path: String,
+    installation_path: String,
+) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    let source_path = Path::new(&library_path).join(&character_name);
+    let target_dir = Path::new(&installation_path)
+        .join("user")
+        .join("client")
+        .join("0")
+        .join("customcharacters");
+
+    // Create target directory if it doesn't exist
+    fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Failed to create target directory: {}", e))?;
+
+    let target_path = target_dir.join(&character_name);
+
+    // Copy the file
+    fs::copy(&source_path, &target_path)
+        .map_err(|e| format!("Failed to copy character file: {}", e))?;
+
+    info!(
+        "Deployed character {} from {} to {}",
+        character_name,
+        source_path.display(),
+        target_path.display()
+    );
+
+    Ok(())
+}
+
+#[tauri::command]
+fn import_character_to_library(
+    character_name: String,
+    installation_path: String,
+    library_path: String,
+) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    let source_path = Path::new(&installation_path)
+        .join("user")
+        .join("client")
+        .join("0")
+        .join("customcharacters")
+        .join(&character_name);
+
+    let target_dir = Path::new(&library_path);
+
+    // Create library directory if it doesn't exist
+    fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Failed to create library directory: {}", e))?;
+
+    let target_path = target_dir.join(&character_name);
+
+    // Copy the file
+    fs::copy(&source_path, &target_path)
+        .map_err(|e| format!("Failed to copy character file: {}", e))?;
+
+    info!(
+        "Imported character {} from {} to {}",
+        character_name,
+        source_path.display(),
+        target_path.display()
+    );
+
+    Ok(())
+}
+
+// ===== HID Debug Commands =====
+
+#[tauri::command]
+fn list_hid_devices() -> Result<Vec<hid_reader::HidDeviceListItem>, String> {
+    hid_reader::list_hid_game_controllers()
+}
+
+#[tauri::command]
+fn read_hid_device_report(device_path: String, timeout_ms: Option<i32>) -> Result<Vec<u8>, String> {
+    let timeout = timeout_ms.unwrap_or(50);
+    hid_reader::read_hid_report(&device_path, timeout)
+}
+
+#[tauri::command]
+fn parse_hid_report(report: Vec<u8>) -> Result<hid_reader::HidAxisReport, String> {
+    // Don't read descriptor on every report - that causes device conflicts
+    // Axis names should be fetched once at startup via get_hid_axis_names
+    let empty_names = std::collections::HashMap::new();
+    hid_reader::parse_hid_axes(&report, &empty_names)
+}
+
+#[tauri::command]
+fn get_hid_axis_names(device_path: String) -> Result<std::collections::HashMap<u32, String>, String> {
+    hid_reader::get_axis_names_from_descriptor(&device_path)
+}
+
+#[tauri::command]
+fn get_axis_names_for_device(device_name: String) -> Result<std::collections::HashMap<u32, String>, String> {
+    // Try to find a matching HID device by name
+    // This helps bridge the gap between DirectInput devices and HID devices
+    
+    let hid_devices = hid_reader::list_hid_game_controllers()
+        .map_err(|e| format!("Failed to list HID devices: {}", e))?;
+    
+    // Try to find a device with a matching name
+    let matching_device = hid_devices.iter().find(|dev| {
+        if let Some(product) = &dev.product {
+            // Simple case-insensitive substring match
+            product.to_lowercase().contains(&device_name.to_lowercase()) ||
+            device_name.to_lowercase().contains(&product.to_lowercase())
+        } else {
+            false
+        }
+    });
+    
+    if let Some(device) = matching_device {
+        eprintln!("[Axis Names] Found HID device for '{}': {:?}", device_name, device.product);
+        hid_reader::get_axis_names_from_descriptor(&device.path)
+    } else {
+        eprintln!("[Axis Names] No matching HID device found for '{}'", device_name);
+        Err(format!("No HID device found matching name: {}", device_name))
+    }
+}
+
+// ===== End HID Debug Commands =====
+
+#[tauri::command]
+fn delete_character_from_library(
+    character_name: String,
+    library_path: String,
+) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    let file_path = Path::new(&library_path).join(&character_name);
+
+    // Delete the file
+    fs::remove_file(&file_path).map_err(|e| format!("Failed to delete character file: {}", e))?;
+
+    info!("Deleted character {} from library", character_name);
+
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_character_from_installation(
+    character_name: String,
+    installation_path: String,
+) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    // Build path to character file in installation
+    // Path format: {install}\user\client\0\customcharacters\{character_name}
+    let char_file_path = Path::new(&installation_path)
+        .join("user")
+        .join("client")
+        .join("0")
+        .join("customcharacters")
+        .join(&character_name);
+
+    // Delete the file
+    fs::remove_file(&char_file_path).map_err(|e| format!("Failed to delete character file: {}", e))?;
+
+    info!("Deleted character {} from installation", character_name);
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -1232,7 +1482,17 @@ pub fn run() {
             get_resource_dir,
             open_url,
             generate_unbind_profile,
-            remove_unbind_profile
+            remove_unbind_profile,
+            scan_character_files,
+            deploy_character_to_installation,
+            import_character_to_library,
+            delete_character_from_library,
+            delete_character_from_installation,
+            list_hid_devices,
+            read_hid_device_report,
+            parse_hid_report,
+            get_hid_axis_names,
+            get_axis_names_for_device
         ])
         .setup(|app| {
             // Set up logging

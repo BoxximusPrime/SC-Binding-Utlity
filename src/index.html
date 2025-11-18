@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="joystick-viewer.css" />
   <link rel="stylesheet" href="template-editor.css" />
   <link rel="stylesheet" href="input-debugger.css" />
+  <link rel="stylesheet" href="character-manager.css" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Star Citizen Bindnig Utility</title>
   <script>
@@ -29,6 +30,7 @@
   <script type="module" src="/joystick-viewer.js" defer></script>
   <script type="module" src="/template-editor.js" defer></script>
   <script type="module" src="/input-debugger.js" defer></script>
+  <script type="module" src="/character-manager.js" defer></script>
 </head>
 
 <body>
@@ -66,6 +68,7 @@
           <button id="tab-visual" class="tab-btn" data-tab="visual">Visual View</button>
           <button id="tab-template" class="tab-btn" data-tab="template">Template Editor</button>
           <button id="tab-debugger" class="tab-btn" data-tab="debugger">Input Debugger</button>
+          <button id="tab-character" class="tab-btn" data-tab="character">Characters</button>
           <button id="tab-help" class="tab-btn" data-tab="help">❓ Help</button>
           <button id="tab-settings" class="tab-btn tab-settings-btn" data-tab="settings"
             title="Settings & Debug">⚙️</button>
@@ -453,62 +456,129 @@
       <div id="tab-content-debugger" class="tab-content">
         <div class="tab-subheader">
           <h2>Input Debugger</h2>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <button id="switch-to-basic-debug" class="btn btn-secondary btn-sm active">Basic Debugger</button>
+            <button id="switch-to-hid-debug" class="btn btn-secondary btn-sm">🔬 HID Raw Data</button>
+          </div>
         </div>
 
-        <div class="container">
-          <main>
-            <div class="debugger-controls">
-              <button id="start-debug-btn" class="btn btn-primary">▶ Start Detecting</button>
-              <button id="stop-debug-btn" class="btn btn-secondary" disabled>⏸ Stop Detecting</button>
-              <button id="clear-debug-btn" class="btn btn-secondary">🗑️ Clear Log</button>
-              <button id="show-devices-btn" class="btn btn-secondary">🎮 Show Devices</button>
-              <span id="debug-status" class="status-indicator">Ready</span>
-            </div>
+        <!-- Basic Debugger View -->
+        <div id="basic-debugger-view" class="debugger-view">
+          <div class="container">
+            <main>
+              <div class="debugger-controls">
+                <button id="start-debug-btn" class="btn btn-primary">▶ Start Detecting</button>
+                <button id="stop-debug-btn" class="btn btn-secondary" disabled>⏸ Stop Detecting</button>
+                <button id="clear-debug-btn" class="btn btn-secondary">🗑️ Clear Log</button>
+                <button id="show-devices-btn" class="btn btn-secondary">🎮 Show Devices</button>
+                <span id="debug-status" class="status-indicator">Ready</span>
+              </div>
 
-            <div class="timeline-container">
-              <div class="timeline-header">
-                <h2>Input Timeline</h2>
-                <div class="timeline-info">
-                  <span id="event-count">0 events</span>
-                  <label>
-                    <input type="checkbox" id="auto-scroll-checkbox" checked>
-                    Auto-scroll
-                  </label>
+              <div class="timeline-container">
+                <div class="timeline-header">
+                  <h2>Input Timeline</h2>
+                  <div class="timeline-info">
+                    <span id="event-count">0 events</span>
+                    <label>
+                      <input type="checkbox" id="auto-scroll-checkbox" checked>
+                      Auto-scroll
+                    </label>
+                  </div>
+                </div>
+                <div id="timeline" class="timeline">
+                  <div class="timeline-empty">
+                    Press "Start Detecting" and then press any button or move any axis on your joystick...
+                  </div>
                 </div>
               </div>
-              <div id="timeline" class="timeline">
-                <div class="timeline-empty">
-                  Press "Start Detecting" and then press any button or move any axis on your joystick...
-                </div>
-              </div>
-            </div>
 
-            <div class="stats-container">
-              <h3>Statistics</h3>
-              <div class="stats-grid">
-                <div class="stat-card">
-                  <div class="stat-label">Total Events</div>
-                  <div class="stat-value" id="stat-total">0</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-label">Unique Buttons</div>
-                  <div class="stat-value" id="stat-buttons">0</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-label">Unique Axes</div>
-                  <div class="stat-value" id="stat-axes">0</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-label">Hat Switches</div>
-                  <div class="stat-value" id="stat-hats">0</div>
+              <div class="stats-container">
+                <h3>Statistics</h3>
+                <div class="stats-grid">
+                  <div class="stat-card">
+                    <div class="stat-label">Total Events</div>
+                    <div class="stat-value" id="stat-total">0</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">Unique Buttons</div>
+                    <div class="stat-value" id="stat-buttons">0</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">Unique Axes</div>
+                    <div class="stat-value" id="stat-axes">0</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">Hat Switches</div>
+                    <div class="stat-value" id="stat-hats">0</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </main>
+            </main>
+          </div>
+        </div>
+
+        <!-- HID Debugger View (iframe to separate page) -->
+        <div id="hid-debugger-view" class="debugger-view" style="display: none;">
+          <iframe src="hid-debugger.html"
+            style="width: 100%; height: calc(100vh - 180px); border: none; background: var(--bg-dark); overflow-y: auto;"></iframe>
         </div>
       </div>
 
-      <!-- TAB 5: Help Page -->
+      <!-- TAB 5: Character Manager Page -->
+      <div id="tab-content-character" class="tab-content">
+        <div class="tab-subheader">
+          <h2>👤 Character Appearance Manager</h2>
+          <p class="tab-description">Backup and manage your Star Citizen character appearance files across installations
+          </p>
+        </div>
+
+        <div class="character-manager-container">
+          <!-- Master Library Section -->
+          <div class="character-section master-library-section">
+            <div class="section-header">
+              <h3>📚 Master Character Library</h3>
+              <div style="display: flex; gap: 0.5rem;">
+                <button id="refresh-characters-btn" class="btn btn-secondary">🔄 Refresh All</button>
+                <button id="set-library-path-btn" class="btn btn-primary">📁 Set Library Path</button>
+              </div>
+            </div>
+
+            <div class="library-path-display" id="library-path-display">
+              <span class="path-label">Library Location:</span>
+              <span class="path-value" id="library-path-value">Not configured</span>
+            </div>
+
+            <div class="master-characters-list" id="master-characters-list">
+              <div class="empty-state">
+                <div class="empty-state-icon">📂</div>
+                <h3>No Character Library</h3>
+                <p>Set a library path to start managing your character appearances</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Installation Tabs -->
+          <div class="character-section installations-section">
+            <div class="section-header">
+              <h3>🚀 Installation Characters</h3>
+            </div>
+
+            <div class="installation-tabs" id="installation-tabs">
+              <div class="empty-state">
+                <div class="empty-state-icon">🔍</div>
+                <h3>No Installations Found</h3>
+                <p>Configure your SC directory in Auto Save Settings to detect installations</p>
+              </div>
+            </div>
+
+            <div class="installation-content" id="installation-content">
+              <!-- Installation-specific character lists will appear here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: Help Page -->
       <div id="tab-content-help" class="tab-content">
         <div class="tab-subheader">
           <h2>❓ Help & Tips</h2>
@@ -684,7 +754,7 @@
         </div>
       </div>
 
-      <!-- TAB 6: Settings Page -->
+      <!-- TAB 7: Settings Page -->
       <div id="tab-content-settings" class="tab-content">
         <div class="tab-subheader">
           <h2>⚙️ Settings & Debug</h2>
@@ -1015,14 +1085,13 @@
           <div class="device-detection-box">
 
             <label>
-              Axis Mapping Profile:
-              <select id="template-page-axis-profile"></select>
+              Axis Detection:
+              <div class="info-text" id="template-page-axis-summary">Using HID descriptor axis detection</div>
             </label>
-            <div class="info-text" id="template-page-axis-summary"></div>
 
             <div class="custom-axis-actions">
               <button id="open-custom-axis-modal" class="btn btn-secondary btn-sm">Configure Custom Mapping</button>
-              <span class="info-text">Use this if your device isn't listed or needs a unique mapping.</span>
+              <span class="info-text">Use this if your device needs a custom axis mapping.</span>
             </div>
           </div>
 
@@ -1168,19 +1237,17 @@
   <div id="whats-new-modal" class="modal" style="display: none;">
     <div class="modal-content whats-new-modal-content">
       <div class="modal-header">
-        <h2>🎉 What's New in v0.7.1</h2>
+        <h2>🎉 What's New in v0.8.0</h2>
       </div>
       <div class="modal-body whats-new-body">
         <div class="whats-new-section">
           <h3>✨ New Features</h3>
           <ul>
-            <li><strong>Template Editor V2: </strong>A total refactor of the templating system - can now support
-              variable numbers of pages, and manual axis definition with presets (more presets will be added later,
-              initial presets may be innacurate - so verify your axes!).
+            <li><strong>New Axis Detection:</strong> Using a new backend for axis detection based on HID descriptors for
+              more accurate and dynamic axis mapping (shotout to bioticbynature for the HID descriptor parsing code).
             </li>
-            <li><strong>Clickable Button IDs:</strong> You can now click on button IDs in the binding info to quickly
-              search for them in the main keybindings view.</li>
-          </ul>
+            <li><strong>Character Manager:</strong> Added a character manager to backup and deploy your saved character
+              files to/from multiple Star Citizen installations.</li>
         </div>
         <div class="whats-new-section">
           <h3>🔧 Improvements</h3>
@@ -1188,15 +1255,6 @@
             <li><strong>Template Editor: </strong>Experimenting with page image size normalization for better
               consistency.</li>
             <li><strong>Visual view: </strong>now has better button/text rendering.</li>
-          </ul>
-        </div>
-        <div class="whats-new-section">
-          <h3>🧩 0.7.1</h3>
-          <ul>
-            <li><strong>Template editor:</strong> Removed redundant device binding (as it's per page now).
-            <li><strong>Tab Shorcut:</strong> Added tab to lop through pages in template editor and visual view.</li>
-            <li><strong>Removing Bind:</strong> Fixed bug where removing a binding would remove ALL bindings of the same
-              type.</li>
           </ul>
         </div>
         <div class="whats-new-section">

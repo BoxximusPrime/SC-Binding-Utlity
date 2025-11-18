@@ -4,11 +4,8 @@ const DEFAULT_TEMPLATE_V2 = {
     pages: []
 };
 
-// Minimal fallback for when Tauri backend is not available (development/testing only)
-// In production, axis profiles are always loaded from device-database.json via the backend
-const FALLBACK_AXIS_PROFILE = {
-    default: { x: 0, y: 1, z: 2, rotx: 3, roty: 4, rotz: 5, slider: 6, hat: 9 }
-};
+// NOTE: Axis profiles are now determined dynamically from HID descriptors
+// No hardcoded fallback profiles - we rely 100% on actual hardware detection
 
 const LOGICAL_AXIS_OPTIONS = ['x', 'y', 'z', 'rotx', 'roty', 'rotz', 'slider', 'slider2', 'hat'];
 const RAW_AXIS_RANGE = Array.from({ length: 8 }, (_, index) => index);
@@ -17,8 +14,6 @@ const state = {
     template: cloneDeep(DEFAULT_TEMPLATE_V2),
     selectedPageId: null,
     devices: [],
-    axisProfiles: {},
-    axisProfileOrder: [],
     modalEditingPageId: null,
     modalCustomMapping: {},
     modalImagePath: '',
@@ -33,7 +28,9 @@ const state = {
     axisDetectionSessionId: null,
     axisDetectionIntervalId: null,
     lastAxisValues: {},
-    lastAxisUpdateTime: {}
+    lastAxisUpdateTime: {},
+    // HID axis names from descriptor
+    detectedAxisNames: {} // Map of axis_index -> axis_name from HID descriptor
 };
 
 const dom = {
@@ -49,7 +46,7 @@ const dom = {
     detectedDeviceName: null,
     detectedDeviceUuid: null,
     deviceDetectionStatus: null,
-    axisProfileSelect: null,
+    // axisProfileSelect: REMOVED - now using HID descriptors exclusively
     axisSummary: null,
     openCustomAxisBtn: null,
     pageSaveBtn: null,
@@ -125,21 +122,18 @@ function getSelectedDevice(deviceUuid)
 function describeAxisMapping(page)
 {
     if (!page) return 'No axis mapping configured';
-    if (page.axis_profile && page.axis_profile !== 'custom')
-    {
-        return `Axis profile: ${page.axis_profile}`;
-    }
+
     const entries = Object.entries(page.axis_mapping || {});
     if (!entries.length)
     {
-        return 'Custom mapping (not configured)';
+        return 'Axis mapping not configured';
     }
     const summary = entries
         .slice(0, 4)
         .map(([raw, logical]) => `${raw}→${logical}`)
         .join(', ');
     const more = entries.length > 4 ? ` +${entries.length - 4} more` : '';
-    return `Custom mapping: ${summary}${more}`;
+    return `Axis mapping: ${summary}${more}`;
 }
 
 async function refreshDevices()
@@ -208,45 +202,6 @@ async function handleRefreshDevices()
     }
 }
 
-async function refreshAxisProfiles()
-{
-    const invoke = getInvoke();
-    if (!invoke)
-    {
-        // Tauri not available - use minimal fallback
-        console.warn('Tauri backend not available, using fallback axis profile');
-        state.axisProfiles = cloneDeep(FALLBACK_AXIS_PROFILE);
-        state.axisProfileOrder = Object.keys(state.axisProfiles);
-        populateAxisProfileSelect();
-        return;
-    }
-    try
-    {
-        const profiles = await invoke('get_axis_profiles');
-        if (profiles && typeof profiles === 'object' && Object.keys(profiles).length > 0)
-        {
-            state.axisProfiles = profiles;
-        } else
-        {
-            // Backend returned empty/invalid data - use fallback
-            console.warn('Backend returned invalid axis profiles, using fallback');
-            state.axisProfiles = cloneDeep(FALLBACK_AXIS_PROFILE);
-        }
-    } catch (error)
-    {
-        console.error('Failed to load axis profiles from backend:', error);
-        state.axisProfiles = cloneDeep(FALLBACK_AXIS_PROFILE);
-    }
-    // Ensure default profile exists
-    if (!state.axisProfiles.default)
-    {
-        console.warn('No default axis profile found, adding fallback default');
-        state.axisProfiles.default = cloneDeep(FALLBACK_AXIS_PROFILE.default);
-    }
-    state.axisProfileOrder = Object.keys(state.axisProfiles).sort();
-    populateAxisProfileSelect();
-}
-
 function populateDeviceSelect()
 {
     if (!dom.pageDeviceSelect) return;
@@ -266,21 +221,6 @@ function populateDeviceSelect()
     {
         dom.pageDeviceSelect.value = state.detectedDeviceUuid;
     }
-}
-
-function populateAxisProfileSelect()
-{
-    if (!dom.axisProfileSelect) return;
-    const seen = new Set();
-    const options = [];
-    [...state.axisProfileOrder, 'default'].forEach(name =>
-    {
-        if (!name || seen.has(name)) return;
-        seen.add(name);
-        options.push(`<option value="${name}">${name}</option>`);
-    });
-    options.push('<option value="custom">Custom Mapping</option>');
-    dom.axisProfileSelect.innerHTML = options.join('');
 }
 
 function renderPageList()
@@ -364,6 +304,7 @@ function openPageModal(pageId = null)
     state.modalImageDataUrl = null;
     state.detectedDeviceUuid = null;
     state.detectedDeviceName = null;
+    state.detectedAxisNames = {};
 
     // Refresh devices list when modal opens
     refreshDevices();
@@ -390,6 +331,9 @@ function openPageModal(pageId = null)
                 {
                     dom.pageDeviceSelect.value = page.device_uuid;
                 }
+
+                // Load axis names for this device
+                loadAxisNamesForDevice(page.device_name);
             }
             else
             {
@@ -400,14 +344,11 @@ function openPageModal(pageId = null)
                 {
                     dom.pageDeviceSelect.value = '';
                 }
+                // Clear axis names
+                state.detectedAxisNames = {};
             }
 
-            dom.axisProfileSelect.value = page.axis_profile || 'default';
             state.modalCustomMapping = cloneDeep(page.axis_mapping || {});
-            if (page.axis_profile && dom.axisProfileSelect.querySelector(`option[value="${page.axis_profile}"]`))
-            {
-                dom.axisProfileSelect.value = page.axis_profile;
-            }
 
             // Load image info
             state.modalImagePath = page.image_path || '';
@@ -434,7 +375,7 @@ function openPageModal(pageId = null)
         dom.detectedDeviceName.textContent = 'No device detected';
         dom.detectedDeviceUuid.style.display = 'none';
         dom.detectedDeviceInfo.classList.remove('detected');
-        dom.axisProfileSelect.value = 'default';
+        // Axis profile is now determined from HID descriptor, not from dropdown
 
         // Clear image info
         if (dom.pageImageInfo) dom.pageImageInfo.textContent = '';
@@ -452,7 +393,6 @@ function openPageModal(pageId = null)
     }
 
     dom.deviceDetectionStatus.textContent = 'Press any button on your joystick or gamepad to identify it.';
-    updateAxisSummary();
 
     // Add input listener to update modal title as user types page name
     dom.pageNameInput.removeEventListener('input', updatePageModalTitle);
@@ -500,16 +440,8 @@ function savePageFromModal()
             deviceName = selectedDevice.name;
         }
     }
-    const axisProfile = dom.axisProfileSelect.value;
-    let axisMapping = {};
-
-    if (axisProfile && axisProfile !== 'custom')
-    {
-        axisMapping = invertProfile(state.axisProfiles[axisProfile] || state.axisProfiles.default || {});
-    } else
-    {
-        axisMapping = cloneDeep(state.modalCustomMapping || {});
-    }
+    // Always use custom mapping (from HID descriptor or user configuration)
+    const axisMapping = cloneDeep(state.modalCustomMapping || {});
 
     // Get image and mirror settings
     const imagePath = state.modalImagePath || '';
@@ -524,7 +456,6 @@ function savePageFromModal()
             page.name = name;
             page.device_uuid = deviceUuid;
             page.device_name = deviceName;
-            page.axis_profile = axisProfile;
             page.axis_mapping = axisMapping;
             page.image_path = imagePath;
             page.image_data_url = imageDataUrl;
@@ -609,7 +540,6 @@ function savePageFromModal()
             name,
             device_uuid: deviceUuid,
             device_name: deviceName,
-            axis_profile: axisProfile,
             axis_mapping: axisMapping,
             image_path: imagePath,
             image_data_url: imageDataUrl,
@@ -670,16 +600,15 @@ function openCustomAxisModal()
 {
     if (!dom.customAxisModal || !dom.customAxisTable) return;
 
-    // Store the original profile selection and mapping so we can detect changes
-    state.originalAxisProfile = dom.axisProfileSelect.value;
+    // Store the original mapping so we can detect changes
     state.originalCustomMapping = cloneDeep(state.modalCustomMapping);
 
-    // If a preset is selected, load its values into the custom mapping view
-    const currentProfile = dom.axisProfileSelect.value;
-    if (currentProfile && currentProfile !== 'custom' && state.axisProfiles[currentProfile])
+    // Auto-populate mapping from HID descriptor if available and mapping is empty
+    if (Object.keys(state.modalCustomMapping).length === 0 && Object.keys(state.detectedAxisNames).length > 0)
     {
-        // Convert profile (logical->raw) to mapping (raw->logical) for display
-        state.modalCustomMapping = invertProfile(state.axisProfiles[currentProfile]);
+        // Create mapping based on HID descriptor axis names
+        // The axis IDs from the descriptor directly correspond to the axis indices in the report
+        state.modalCustomMapping = autoMapFromHidDescriptor();
     }
 
     renderCustomAxisTable();
@@ -693,22 +622,94 @@ function closeCustomAxisModal()
     dom.customAxisModal.style.display = 'none';
 }
 
+// Auto-map axes based on HID descriptor names
+function autoMapFromHidDescriptor()
+{
+    const mapping = {};
+
+    // The detectedAxisNames keys are the actual axis IDs from the HID report
+    // These correspond directly to the indices used in axis_values
+    // We need to map these to 0-based raw indices for our UI
+    for (const [axisId, axisName] of Object.entries(state.detectedAxisNames))
+    {
+        // axisId from HID descriptor corresponds to the axis index in the report
+        // We need to find which "raw axis" slot (0-7) this should go into
+        // The axis IDs in the report ARE the raw indices (just 1-based vs 0-based)
+
+        const rawIndex = parseInt(axisId) - 1; // Convert 1-based to 0-based
+
+        // Map HID axis name to logical Star Citizen axis name
+        const logicalAxis = mapHidNameToLogical(axisName);
+
+        if (logicalAxis && rawIndex >= 0 && rawIndex < 8)
+        {
+            mapping[rawIndex] = logicalAxis;
+            console.log(`[Auto-map] Axis ${axisId} (${axisName}) -> Raw ${rawIndex} -> ${logicalAxis}`);
+        }
+    }
+
+    console.log('[Auto-map] Final mapping:', mapping);
+    return mapping;
+}
+
+// Map HID axis names to Star Citizen logical axis names
+function mapHidNameToLogical(hidName)
+{
+    // HID names from hut crate (Debug format) to our logical names
+    const nameMap = {
+        'X': 'x',
+        'Y': 'y',
+        'Z': 'z',
+        'Rx': 'rotx',
+        'Ry': 'roty',
+        'Rz': 'rotz',
+        'Slider': 'slider',
+        'Dial': 'slider2',
+        'Wheel': 'slider2',
+        'HatSwitch': 'hat',
+        // Handle variations
+        'RotationX': 'rotx',
+        'RotationY': 'roty',
+        'RotationZ': 'rotz'
+    };
+
+    return nameMap[hidName] || null;
+}
+
 function renderCustomAxisTable()
 {
     const mapping = state.modalCustomMapping || {};
-    dom.customAxisTable.innerHTML = RAW_AXIS_RANGE.map(rawIndex =>
+
+    const rows = RAW_AXIS_RANGE.map(rawIndex =>
     {
         const isAssigned = mapping[rawIndex] && mapping[rawIndex] !== '';
+
+        // Get HID axis name if available
+        // The detectedAxisNames keys are 1-based axis indices from the descriptor
+        // We need to find which HID axis corresponds to this raw index
+        const hidAxisIndex = rawIndex + 1; // Convert 0-based raw to 1-based HID
+        const hidAxisName = state.detectedAxisNames[hidAxisIndex];
+
+        const axisLabel = hidAxisName
+            ? `Raw Axis ${rawIndex} <span style="color: #4CAF50; font-weight: 600;">[HID: ${hidAxisName}]</span>`
+            : `Raw Axis ${rawIndex}`;
+
+        console.log(`[Render] Raw ${rawIndex} -> HID Index ${hidAxisIndex} -> Name: ${hidAxisName} -> Mapped to: ${mapping[rawIndex]}`);
+
+        const options = LOGICAL_AXIS_OPTIONS.map(axis =>
+            `<option value="${axis}" ${mapping[rawIndex] === axis ? 'selected' : ''}>${axis}</option>`
+        ).join('');
+
         return `<div class="custom-axis-row ${isAssigned ? 'axis-assigned' : ''}" data-raw-index="${rawIndex}">
-            <label>Raw Axis ${rawIndex}</label>
+            <label>${axisLabel}</label>
             <select data-raw-index="${rawIndex}">
                 <option value="">— Unassigned —</option>
-                ${LOGICAL_AXIS_OPTIONS.map(axis => `
-                    <option value="${axis}" ${mapping[rawIndex] === axis ? 'selected' : ''}>${axis}</option>
-                `).join('')}
+                ${options}
             </select>
         </div>`;
-    }).join('');
+    });
+
+    dom.customAxisTable.innerHTML = rows.join('');
 
     // Add change listeners to update green highlight when user changes values
     dom.customAxisTable.querySelectorAll('select').forEach(select =>
@@ -739,21 +740,7 @@ function saveCustomAxisMapping()
         }
     });
 
-    // Check if the user actually changed anything from the original
-    const originalMapping = state.originalCustomMapping || {};
-    const originalProfile = state.originalAxisProfile;
-
-    // Compare if mapping changed
-    const mappingChanged = JSON.stringify(mapping) !== JSON.stringify(originalMapping);
-
-    // If user was on a preset and made changes, switch to custom
-    if (originalProfile && originalProfile !== 'custom' && mappingChanged)
-    {
-        dom.axisProfileSelect.value = 'custom';
-    }
-
     state.modalCustomMapping = mapping;
-    updateAxisSummary();
     closeCustomAxisModal();
 }
 
@@ -767,20 +754,15 @@ function resetCustomAxisMapping()
 function updateAxisSummary()
 {
     if (!dom.axisSummary) return;
-    if (dom.axisProfileSelect.value === 'custom')
+    // Check if custom mapping is configured
+    const entries = Object.entries(state.modalCustomMapping || {});
+    if (!entries.length)
     {
-        const entries = Object.entries(state.modalCustomMapping || {});
-        if (!entries.length)
-        {
-            dom.axisSummary.textContent = 'Custom mapping not configured yet.';
-            return;
-        }
-        const summary = entries.map(([raw, logical]) => `${raw}→${logical}`).join(', ');
-        dom.axisSummary.textContent = `Custom mapping: ${summary}`;
+        dom.axisSummary.textContent = 'Using HID descriptor axis detection.';
         return;
     }
-    const profile = dom.axisProfileSelect.value;
-    dom.axisSummary.textContent = profile ? `Using ${profile} axis profile.` : 'No axis profile selected.';
+    const summary = entries.map(([raw, logical]) => `${raw}→${logical}`).join(', ');
+    dom.axisSummary.textContent = `Custom mapping: ${summary}`;
 }
 
 function populateMirrorSelect(currentPageId)
@@ -982,6 +964,9 @@ async function detectDevice()
                 {
                     dom.pageDeviceSelect.value = device.uuid;
                 }
+
+                // Try to load axis names from HID descriptor
+                await loadAxisNamesForDevice(device.name);
             }
             else
             {
@@ -1038,6 +1023,50 @@ function stopDeviceDetection()
         dom.detectDeviceBtn.textContent = '🎯 Press Button on Device';
         dom.detectDeviceBtn.classList.remove('btn-warning');
         dom.detectDeviceBtn.classList.add('btn-primary');
+    }
+}
+
+// Load axis names from HID descriptor for a device
+async function loadAxisNamesForDevice(deviceName)
+{
+    const invoke = getInvoke();
+    if (!invoke)
+    {
+        console.warn('[Axis Names] Tauri API not available');
+        return;
+    }
+
+    try
+    {
+        console.log(`[Axis Names] Loading axis names for device: ${deviceName}`);
+        const axisNames = await invoke('get_axis_names_for_device', { deviceName });
+
+        state.detectedAxisNames = axisNames || {};
+        const count = Object.keys(state.detectedAxisNames).length;
+
+        console.log(`[Axis Names] Raw response:`, axisNames);
+        console.log(`[Axis Names] Axis IDs found:`, Object.keys(state.detectedAxisNames));
+        console.log(`[Axis Names] Axis names found:`, Object.values(state.detectedAxisNames));
+
+        if (count > 0)
+        {
+            console.log(`[Axis Names] Successfully loaded ${count} axis names:`, state.detectedAxisNames);
+
+            // Update the custom axis table if it's currently open
+            if (dom.customAxisModal && dom.customAxisModal.style.display === 'flex')
+            {
+                renderCustomAxisTable();
+            }
+        }
+        else
+        {
+            console.log('[Axis Names] No axis names detected from HID descriptor');
+        }
+    }
+    catch (error)
+    {
+        console.warn('[Axis Names] Could not load axis names from HID descriptor:', error);
+        state.detectedAxisNames = {};
     }
 }
 
@@ -1202,6 +1231,9 @@ function onDeviceSelectChange()
             dom.detectedDeviceInfo.classList.add('detected');
             dom.deviceDetectionStatus.textContent = `✓ Device selected: ${device.name}`;
             dom.deviceDetectionStatus.className = 'info-text';
+
+            // Load axis names for this device
+            loadAxisNamesForDevice(device.name);
         }
     }
     else
@@ -1209,6 +1241,7 @@ function onDeviceSelectChange()
         // User cleared selection
         state.detectedDeviceUuid = null;
         state.detectedDeviceName = null;
+        state.detectedAxisNames = {};
         dom.detectedDeviceName.textContent = 'No device detected';
         dom.detectedDeviceUuid.style.display = 'none';
         dom.detectedDeviceInfo.classList.remove('detected');
@@ -1249,7 +1282,6 @@ export async function initializeTemplatePagesUI(options = {})
     dom.detectedDeviceName = document.getElementById('detected-device-name');
     dom.detectedDeviceUuid = document.getElementById('detected-device-uuid');
     dom.deviceDetectionStatus = document.getElementById('device-detection-status');
-    dom.axisProfileSelect = document.getElementById('template-page-axis-profile');
     dom.axisSummary = document.getElementById('template-page-axis-summary');
     dom.openCustomAxisBtn = document.getElementById('open-custom-axis-modal');
     dom.pageSaveBtn = document.getElementById('template-page-save-btn');
@@ -1287,14 +1319,6 @@ export async function initializeTemplatePagesUI(options = {})
             closePageModal();
         }
     });
-    dom.axisProfileSelect?.addEventListener('change', () =>
-    {
-        if (dom.axisProfileSelect.value !== 'custom')
-        {
-            state.modalCustomMapping = {};
-        }
-        updateAxisSummary();
-    });
     dom.openCustomAxisBtn?.addEventListener('click', () =>
     {
         openCustomAxisModal();
@@ -1320,7 +1344,8 @@ export async function initializeTemplatePagesUI(options = {})
         });
     }
 
-    await Promise.all([refreshDevices(), refreshAxisProfiles()]);
+    await refreshDevices();
+    // Axis profiles are now determined dynamically from HID descriptors per-device
     state.initialized = true;
 
     window.templateV2State = state;

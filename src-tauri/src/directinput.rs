@@ -724,7 +724,7 @@ pub fn wait_for_input(
                                     buttons_pressed
                                 )),
                                 raw_code_index: Some(button_num),
-                                device_name: Some(format!("XInput Controller {}", controller_id)),
+                                device_name: Some(format!("Xbox Controller (XInput {})", controller_id)),
                                 device_gilrs_id: None,
                                 device_power_info: None,
                                 device_is_ff_supported: None,
@@ -829,7 +829,7 @@ pub fn wait_for_input(
                                 raw_axis_code: Some(format!("XInput {}", axis_name)),
                                 raw_button_code: None,
                                 raw_code_index: Some(*axis_index),
-                                device_name: Some(format!("XInput Controller {}", controller_id)),
+                                device_name: Some(format!("Xbox Controller (XInput {})", controller_id)),
                                 device_gilrs_id: None,
                                 device_power_info: None,
                                 device_is_ff_supported: None,
@@ -1555,7 +1555,7 @@ pub fn wait_for_inputs_with_events(
                                     buttons_pressed
                                 )),
                                 raw_code_index: Some(button_num),
-                                device_name: Some(format!("XInput Controller {}", controller_id)),
+                                device_name: Some(format!("Xbox Controller (XInput {})", controller_id)),
                                 device_gilrs_id: None,
                                 device_power_info: None,
                                 device_is_ff_supported: None,
@@ -1669,7 +1669,7 @@ pub fn wait_for_inputs_with_events(
                                 raw_axis_code: Some(format!("XInput {}", axis_name)),
                                 raw_button_code: None,
                                 raw_code_index: Some(*axis_index),
-                                device_name: Some(format!("XInput Controller {}", controller_id)),
+                                device_name: Some(format!("Xbox Controller (XInput {})", controller_id)),
                                 device_gilrs_id: None,
                                 device_power_info: None,
                                 device_is_ff_supported: None,
@@ -1793,6 +1793,13 @@ pub fn list_connected_devices() -> Result<Vec<DeviceInfo>, String> {
 
     for (_id, gamepad) in gilrs.gamepads() {
         let name = get_friendly_device_name(&gamepad);
+
+        // Skip Xbox controllers in Gilrs if we're on Windows, as we'll add them via XInput
+        // This prevents duplicates and ensures we use the XInput UUIDs that match our input detection
+        if cfg!(windows) && (name.to_lowercase().contains("xbox") || name.to_lowercase().contains("xinput")) {
+            continue;
+        }
+
         let is_connected = gamepad.is_connected();
         let id = usize::from(gamepad.id());
         let uuid = resolve_device_uuid(&gamepad, id);
@@ -1818,6 +1825,29 @@ pub fn list_connected_devices() -> Result<Vec<DeviceInfo>, String> {
             .to_string(),
             is_connected,
         });
+    }
+
+    // Add XInput devices explicitly
+    // This ensures that if wait_for_input detects via XInput fallback, we have a matching device in the list
+    if let Ok(xinput) = XInputHandle::load_default() {
+        for i in 0..4 {
+            if xinput.get_state(i).is_ok() {
+                let uuid = resolve_xinput_uuid(i);
+                
+                // Only add if not already present (though UUIDs will likely differ from Gilrs)
+                if !devices.iter().any(|d| d.uuid == uuid) {
+                    devices.push(DeviceInfo {
+                        uuid,
+                        name: format!("Xbox Controller (XInput {})", i),
+                        axis_count: 6,
+                        button_count: 15,
+                        hat_count: 1,
+                        device_type: "Gamepad".to_string(),
+                        is_connected: true,
+                    });
+                }
+            }
+        }
     }
 
     Ok(devices)

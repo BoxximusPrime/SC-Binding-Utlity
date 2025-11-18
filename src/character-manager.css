@@ -1,0 +1,451 @@
+/* Character Manager Styles */
+
+.character-manager-container {
+    display: flex;
+    flex-direction: row;
+    gap: 6.5rem;
+    padding: 1rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    height: 100%;
+    overflow: hidden;
+}
+
+.tab-description {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Section Styles */
+.character-section {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid var(--bg-lightest);
+    width: 700px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--bg-light);
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--text-primary);
+}
+
+/* Library Path Display */
+.library-path-display {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.path-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.path-value {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+.path-value.empty {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Character Cards */
+.master-characters-list,
+.installation-characters-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.character-card {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+}
+
+.character-card:hover {
+    border-color: var(--primary-color);
+    background: var(--bg-medium);
+}
+
+.character-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.character-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.character-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+}
+
+.character-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.character-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.character-sync-status {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.sync-status-newer {
+    color: #6496ff;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.sync-status-outdated {
+    color: #ffbb44;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.sync-status-missing {
+    color: var(--text-secondary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.character-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.character-status.up-to-date {
+    background: rgba(78, 201, 176, 0.2);
+    color: #4ec9b0;
+}
+
+.character-status.outdated {
+    background: rgba(255, 187, 68, 0.2);
+    color: #ffbb44;
+}
+
+.character-status.newer {
+    background: rgba(100, 150, 255, 0.2);
+    color: #6496ff;
+}
+
+.character-status.missing {
+    background: rgba(255, 100, 100, 0.2);
+    color: #ff6464;
+}
+
+.character-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Installation Tabs */
+.installation-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.installation-tab {
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.installation-tab:hover {
+    background: var(--bg-medium);
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+}
+
+.installation-tab.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.installation-tab-icon {
+    font-size: 1.1rem;
+}
+
+/* Installation Content */
+.installation-content {
+    min-height: 200px;
+}
+
+.installation-panel {
+    display: none;
+}
+
+.installation-panel.active {
+    display: block;
+}
+
+.installation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--bg-medium);
+    border-radius: 6px;
+}
+
+.installation-path {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    font-size: 1.2rem;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* Loading State */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 3rem;
+    color: var(--text-secondary);
+}
+
+/* Info Boxes */
+.info-box {
+    background: rgba(78, 201, 176, 0.1);
+    border-left: 3px solid #4ec9b0;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.info-box p {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.warning-box {
+    background: rgba(255, 187, 68, 0.1);
+    border-left: 3px solid #ffbb44;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.warning-box p {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .character-manager-container {
+        padding: 0.5rem;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .character-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .character-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .installation-tabs {
+        flex-direction: column;
+    }
+
+    .installation-tab {
+        width: 100%;
+    }
+}
+
+/* Toast Notifications */
+.character-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 1rem 1.5rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    animation: slideInUp 0.3s ease-out;
+    max-width: 400px;
+}
+
+.character-notification-success {
+    background: rgba(78, 201, 176, 0.95);
+    color: white;
+    border: 1px solid #4ec9b0;
+}
+
+.character-notification-error {
+    background: rgba(255, 100, 100, 0.95);
+    color: white;
+    border: 1px solid #ff6464;
+}
+
+.character-notification-info {
+    background: rgba(100, 150, 255, 0.95);
+    color: white;
+    border: 1px solid #6496ff;
+}
+
+.notification-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.notification-message {
+    flex: 1;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 0.5rem;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+    opacity: 1;
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

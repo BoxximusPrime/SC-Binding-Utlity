@@ -992,6 +992,14 @@ input[type="checkbox"]:disabled:hover {
   color: var(--text-muted);
 }
 
+.hid-axis-hint {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  font-weight: normal;
+  margin-left: 0.25rem;
+  color: inherit;
+}
+
 .binding-icon {
   font-size: 0.75rem;
 }
@@ -1054,6 +1062,18 @@ input[type="checkbox"]:disabled:hover {
   font-weight: 500;
   cursor: pointer;
   border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.btn-sm.active {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: white !important;
 }
 
 .btn-secondary {
@@ -2190,7 +2210,8 @@ input[type="checkbox"]:disabled:hover {
 .tab-content {
   display: none;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   flex-direction: column;
 }
 

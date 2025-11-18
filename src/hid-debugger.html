@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HID Raw Data Debugger</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="hid-debugger.css">
+    <style>
+        /* Override to ensure scrolling works in iframe */
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .app-container {
+            min-height: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>🔬 HID Raw Data Debugger</h1>
+            <p>Deep dive into USB HID reports to diagnose missing axes (Rx, Ry, Slider)</p>
+        </header>
+
+        <div class="container">
+            <!-- Control Panel -->
+            <section class="debugger-controls">
+                <button id="start-hid-debug-btn" class="btn btn-success">Start HID Polling</button>
+                <button id="stop-hid-debug-btn" class="btn btn-secondary" disabled>Stop Polling</button>
+                <button id="clear-hid-debug-btn" class="btn btn-warning">Clear Data</button>
+                <button id="select-device-btn" class="btn btn-primary">Select Device</button>
+                <div id="hid-debug-status" class="status-indicator">Stopped</div>
+            </section>
+
+            <!-- Device Info Panel -->
+            <section class="device-info-panel">
+                <h2>📱 Selected Device</h2>
+                <div id="device-info-display">
+                    <div class="no-device-selected">No device selected. Click "Select Device" to begin.</div>
+                </div>
+            </section>
+
+            <!-- Live Axis Data -->
+            <section class="live-data-panel">
+                <h2>📊 Live Axis Values (Real-time)</h2>
+                <div class="axis-grid" id="live-axis-grid">
+                    <div class="axis-placeholder">Start polling to see live axis data...</div>
+                </div>
+            </section>
+
+            <!-- Raw Event Stream -->
+            <section class="raw-event-panel">
+                <div class="panel-header">
+                    <h2>📜 Raw Event Stream</h2>
+                    <div class="panel-options">
+                        <label>
+                            <input type="checkbox" id="show-unchanged-values" />
+                            Show unchanged values
+                        </label>
+                        <span id="event-counter">0 events</span>
+                    </div>
+                </div>
+                <div id="raw-event-stream" class="event-stream">
+                    <div class="event-placeholder">Events will appear here...</div>
+                </div>
+            </section>
+
+            <!-- Comparison: Gilrs vs HID -->
+            <section class="comparison-panel">
+                <h2>⚖️ Detection Comparison</h2>
+                <div class="comparison-grid">
+                    <div class="comparison-column">
+                        <h3>Gilrs Detection</h3>
+                        <div id="gilrs-axes" class="axis-list">
+                            <div class="axis-placeholder">No Gilrs data yet</div>
+                        </div>
+                    </div>
+                    <div class="comparison-column">
+                        <h3>HID Detection</h3>
+                        <div id="hid-axes" class="axis-list">
+                            <div class="axis-placeholder">No HID data yet</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="missing-axes-alert" id="missing-axes-alert" style="display: none;">
+                    <strong>⚠️ Missing Axes Detected:</strong>
+                    <span id="missing-axes-list"></span>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Device Selection Modal -->
+    <div id="device-selection-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Select a Device for HID Analysis</h2>
+                <button id="close-device-selection-modal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="device-selection-list" class="device-list">
+                    <div class="loading-spinner">Loading devices...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close-device-selection-footer" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="hid-debugger.js"></script>
+</body>
+
+</html>
