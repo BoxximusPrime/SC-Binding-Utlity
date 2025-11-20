@@ -776,6 +776,21 @@ function getInputDisplayInfo(button, jsNumOverride = null)
             const btnMatch = normalized.match(/button(\d+)/);
             info.shortLabel = btnMatch ? `Button ${btnMatch[1]}` : 'Button';
         }
+        else if (normalized.includes('_hat'))
+        {
+            info.type = 'hat';
+            const hatMatch = normalized.match(/hat(\d+)_(up|down|left|right)/);
+            if (hatMatch)
+            {
+                const hatNum = hatMatch[1];
+                const direction = hatMatch[2].charAt(0).toUpperCase() + hatMatch[2].slice(1);
+                info.shortLabel = `Hat ${hatNum} ${direction}`;
+            }
+            else
+            {
+                info.shortLabel = 'Hat Switch';
+            }
+        }
         else
         {
             info.type = 'input';
@@ -827,6 +842,11 @@ function getInputDisplayInfo(button, jsNumOverride = null)
         else if (button.inputType === 'button')
         {
             setFromString(`js${jsNum}_button${button.inputId}`);
+        }
+        else if (button.inputType === 'hat')
+        {
+            const hatDirection = button.hatDirection || 'up';
+            setFromString(`js${jsNum}_hat${button.inputId}_${hatDirection}`);
         }
     }
 
@@ -2433,17 +2453,27 @@ async function startHatInputDetection(direction)
             }
 
             // Convert to Star Citizen axis format using HID axis name from backend if it's an axis
+            // Skip hat switches - they should be converted by backend already
             if (result.hid_axis_name && adjustedInputString.includes('_axis'))
             {
-                // Convert HID axis name to lowercase SC format (Rz -> rotz, X -> x, etc.)
-                const hidName = result.hid_axis_name.toLowerCase();
-                const scAxisName = hidName === 'rx' ? 'rotx' : 
-                                   hidName === 'ry' ? 'roty' : 
-                                   hidName === 'rz' ? 'rotz' : hidName;
-                
-                // Replace axis number format with axis name format
-                adjustedInputString = adjustedInputString.replace(/axis\d+(?:_(positive|negative))?/, scAxisName);
-                console.log(`Hat ${direction}: Converted to SC format using HID axis name "${result.hid_axis_name}":`, adjustedInputString);
+                const hidName = result.hid_axis_name.toLowerCase().replace(/\s+/g, '');
+
+                // Skip hat switches - they need special handling by the backend
+                if (hidName === 'hatswitch')
+                {
+                    console.log(`Hat ${direction}: Skipping HID axis conversion for hat switch - should already be in hat format`);
+                }
+                else
+                {
+                    // Convert HID axis name to lowercase SC format (Rz -> rotz, X -> x, etc.)
+                    const scAxisName = hidName === 'rx' ? 'rotx' :
+                        hidName === 'ry' ? 'roty' :
+                            hidName === 'rz' ? 'rotz' : hidName;
+
+                    // Replace axis number format with axis name format
+                    adjustedInputString = adjustedInputString.replace(/axis\d+(?:_(positive|negative))?/, scAxisName);
+                    console.log(`Hat ${direction}: Converted to SC format using HID axis name "${result.hid_axis_name}":`, adjustedInputString);
+                }
             }
 
             // Store the adjusted Star Citizen input string in tempButton
@@ -2606,17 +2636,27 @@ async function startInputDetection()
 
             // Convert to Star Citizen axis format using HID axis name from backend (e.g., js1_axis2 -> js1_rz)
             // This ensures we use the actual axis name from the HID descriptor, not hardcoded mappings
+            // Skip hat switches - they should be converted by backend already
             if (result.hid_axis_name && adjustedInputString.includes('_axis'))
             {
-                // Convert HID axis name to lowercase SC format (Rz -> rotz, X -> x, etc.)
-                const hidName = result.hid_axis_name.toLowerCase();
-                const scAxisName = hidName === 'rx' ? 'rotx' : 
-                                   hidName === 'ry' ? 'roty' : 
-                                   hidName === 'rz' ? 'rotz' : hidName;
-                
-                // Replace axis number format with axis name format
-                adjustedInputString = adjustedInputString.replace(/axis\d+(?:_(positive|negative))?/, scAxisName);
-                console.log(`Converted to Star Citizen format using HID axis name "${result.hid_axis_name}":`, adjustedInputString);
+                const hidName = result.hid_axis_name.toLowerCase().replace(/\s+/g, '');
+
+                // Skip hat switches - they need special handling by the backend
+                if (hidName === 'hatswitch')
+                {
+                    console.log('Skipping HID axis conversion for hat switch - should already be in hat format');
+                }
+                else
+                {
+                    // Convert HID axis name to lowercase SC format (Rz -> rotz, X -> x, etc.)
+                    const scAxisName = hidName === 'rx' ? 'rotx' :
+                        hidName === 'ry' ? 'roty' :
+                            hidName === 'rz' ? 'rotz' : hidName;
+
+                    // Replace axis number format with axis name format
+                    adjustedInputString = adjustedInputString.replace(/axis\d+(?:_(positive|negative))?/, scAxisName);
+                    console.log(`Converted to Star Citizen format using HID axis name "${result.hid_axis_name}":`, adjustedInputString);
+                }
             }
             else if (adjustedInputString.includes('_axis'))
             {
@@ -2659,8 +2699,20 @@ async function startInputDetection()
                 const buttonMatch = adjustedInputString.match(/button(\d+)/);
                 const axisNumericMatch = adjustedInputString.match(/axis(\d+)(?:_(positive|negative))?/);
                 const axisSCMatch = adjustedInputString.match(/^(js|gp)\d+_(x|y|z|rotx|roty|rotz|slider)$/);
+                const hatMatch = adjustedInputString.match(/hat(\d+)_(up|down|left|right)/);
 
-                if (buttonMatch)
+                if (hatMatch)
+                {
+                    // Hat switch input (e.g., js2_hat1_up)
+                    const hatNum = parseInt(hatMatch[1]);
+                    const hatDirection = hatMatch[2];
+                    delete tempButton.buttonId;
+                    tempButton.inputType = 'hat';
+                    tempButton.inputId = hatNum;
+                    tempButton.hatDirection = hatDirection;
+                    delete tempButton.axisDirection;
+                }
+                else if (buttonMatch)
                 {
                     const buttonId = parseInt(buttonMatch[1]);
                     tempButton.buttonId = buttonId;

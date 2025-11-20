@@ -945,7 +945,75 @@ pub fn wait_for_input(
                                         .unwrap_or(1)
                                 });
 
-                            eprintln!("[HID Detection] Axis moved: HID usage ID {} ({}) -> DirectInput axis {} -> Display: {} {} (Axis {})",
+                            eprintln!("[HID Detection] Axis movement detected - axis_id: {}, axis_name: {}, axis_index: {}, normalized: {}", 
+                                axis_id, axis_name, axis_index, normalized);
+
+                            // Check if this is a hat switch FIRST (HID Usage ID 0x39 = 57)
+                            if axis_id == 57 || axis_id == 0x39 {
+                                eprintln!("[HID Detection] HAT SWITCH AXIS DETECTED! Usage ID: {}, current_value: {}, normalized: {}, logical_min: {}, logical_max: {}", 
+                                    axis_id, current_value, normalized, logical_min, logical_max);
+
+                                // This is a hat switch! Convert to hat format
+                                // Hat switches use discrete values 0-7 for directions (0=up, 2=right, 4=down, 6=left)
+                                // 8 or 15 means centered
+                                let hat_direction = match current_value {
+                                    0 => "up",
+                                    1 => "up", // diagonal up-right
+                                    2 => "right",
+                                    3 => "right", // diagonal down-right
+                                    4 => "down",
+                                    5 => "down", // diagonal down-left
+                                    6 => "left",
+                                    7 => "left", // diagonal up-left
+                                    8 | 15 => {
+                                        // Centered - skip this detection
+                                        continue;
+                                    },
+                                    _ => {
+                                        // Unknown value - skip
+                                        continue;
+                                    }
+                                };
+
+                                eprintln!("[HID Detection] Hat switch direction determined: {} -> js{}_hat1_{}", hat_direction, device_instance, hat_direction);
+
+                                return Ok(Some(DetectedInput {
+                                    input_string: format!(
+                                        "js{}_hat1_{}",
+                                        device_instance, hat_direction
+                                    ),
+                                    display_name: format!(
+                                        "Joystick {} - Hat 1 {}",
+                                        device_instance,
+                                        hat_direction.to_uppercase()
+                                    ),
+                                    device_type: "Joystick".to_string(),
+                                    axis_value: Some(normalized),
+                                    modifiers: get_active_modifiers(),
+                                    is_modifier: false,
+                                    session_id: session_id.clone(),
+                                    device_uuid: Some(format!(
+                                        "{:04x}:{:04x}",
+                                        device.vendor_id, device.product_id
+                                    )),
+                                    raw_axis_code: Some(format!(
+                                        "HID Usage ID: {} (Hat Switch)",
+                                        axis_id
+                                    )),
+                                    raw_button_code: None,
+                                    raw_code_index: Some(axis_index),
+                                    device_name: Some(device_name.to_string()),
+                                    device_gilrs_id: None,
+                                    device_power_info: None,
+                                    device_is_ff_supported: None,
+                                    all_device_axes: None,
+                                    all_device_buttons: None,
+                                    hid_usage_id: Some(axis_id),
+                                    hid_axis_name: Some(axis_name.to_string()),
+                                }));
+                            }
+
+                            eprintln!("[HID Detection] Regular axis moved: HID usage ID {} ({}) -> DirectInput axis {} -> Display: {} {} (Axis {})",
                                 axis_id, axis_name, axis_index, axis_name, direction_symbol, axis_index);
 
                             return Ok(Some(DetectedInput {
@@ -1301,6 +1369,72 @@ fn wait_for_input_old_gilrs(
                                 // Get HID axis information for this device and axis
                                 let (hid_usage_id, hid_axis_name) =
                                     get_hid_axis_info(&device_name, axis_index);
+
+                                // Check if this is a hat switch (HID Usage ID 0x39 = 57)
+                                // Hat switches report as axes but should be mapped to hat directions
+                                if let Some(usage_id) = hid_usage_id {
+                                    if usage_id == 57 || usage_id == 0x39 {
+                                        // This is a hat switch! Convert axis value to hat direction
+                                        // Hat switch values typically: 0=up, 90=right, 180=down, 270=left
+                                        // Or in some cases: 0=centered, 1=up, 2=up-right, 3=right, etc.
+                                        // We need to detect which direction based on the value
+
+                                        // Determine hat direction from axis value
+                                        // Most hat switches use 8 directions or 4 directions
+                                        // Common values: 0=up, 1=up-right, 2=right, 3=down-right, 4=down, 5=down-left, 6=left, 7=up-left, 8/15=centered
+                                        let hat_direction = if value > 0.5 {
+                                            // Positive direction
+                                            if direction == "positive" {
+                                                "up"
+                                            } else {
+                                                "right"
+                                            }
+                                        } else if value < -0.5 {
+                                            // Negative direction
+                                            if direction == "negative" {
+                                                "down"
+                                            } else {
+                                                "left"
+                                            }
+                                        } else {
+                                            // Skip centered position - wait for actual movement
+                                            continue;
+                                        };
+
+                                        let input_string = format!(
+                                            "{}{}_hat1_{}",
+                                            device_prefix, sc_instance, hat_direction
+                                        );
+                                        let display_name = format!(
+                                            "{} {} - Hat 1 {}",
+                                            device_type_name,
+                                            sc_instance,
+                                            hat_direction.to_uppercase()
+                                        );
+
+                                        return Ok(Some(DetectedInput {
+                                            input_string,
+                                            display_name,
+                                            device_type: device_type_name.to_string(),
+                                            axis_value: Some(value),
+                                            modifiers: get_active_modifiers(),
+                                            is_modifier: false,
+                                            session_id: session_id.clone(),
+                                            device_uuid: Some(device_uuid.clone()),
+                                            raw_axis_code: Some(raw_axis_code.clone()),
+                                            raw_button_code: None,
+                                            raw_code_index: Some(axis_index),
+                                            device_name: Some(device_name.to_string()),
+                                            device_gilrs_id: Some(joystick_id),
+                                            device_power_info: Some(power_info.clone()),
+                                            device_is_ff_supported: Some(is_ff),
+                                            all_device_axes: None,
+                                            all_device_buttons: None,
+                                            hid_usage_id,
+                                            hid_axis_name,
+                                        }));
+                                    }
+                                }
 
                                 return Ok(Some(DetectedInput {
                                     input_string: format!(
@@ -1794,19 +1928,80 @@ pub fn wait_for_multiple_inputs(
                                 let (hid_usage_id, hid_axis_name) =
                                     get_hid_axis_info(&device_name, axis_index);
 
+                                // Check if this is a hat switch (HID Usage ID 0x39 = 57)
+                                // Hat switches report as axes but should be mapped to hat directions
+                                let (input_string, display_name) = if let Some(usage_id) =
+                                    hid_usage_id
+                                {
+                                    if usage_id == 57 || usage_id == 0x39 {
+                                        // This is a hat switch! Convert axis value to hat direction
+                                        let hat_direction = if value > 0.5 {
+                                            if direction == "positive" {
+                                                "up"
+                                            } else {
+                                                "right"
+                                            }
+                                        } else if value < -0.5 {
+                                            if direction == "negative" {
+                                                "down"
+                                            } else {
+                                                "left"
+                                            }
+                                        } else {
+                                            // Centered - skip this
+                                            continue;
+                                        };
+
+                                        (
+                                            format!(
+                                                "{}{}_hat1_{}",
+                                                device_prefix, sc_instance, hat_direction
+                                            ),
+                                            format!(
+                                                "{} {} - Hat 1 {}",
+                                                device_type_name,
+                                                sc_instance,
+                                                hat_direction.to_uppercase()
+                                            ),
+                                        )
+                                    } else {
+                                        // Regular axis
+                                        (
+                                            format!(
+                                                "{}{}_axis{}_{}",
+                                                device_prefix, sc_instance, axis_index, direction
+                                            ),
+                                            format!(
+                                                "{} {} - {} {} (Axis {})",
+                                                device_type_name,
+                                                sc_instance,
+                                                axis_name,
+                                                direction_symbol,
+                                                axis_index
+                                            ),
+                                        )
+                                    }
+                                } else {
+                                    // No HID info available - treat as regular axis
+                                    (
+                                        format!(
+                                            "{}{}_axis{}_{}",
+                                            device_prefix, sc_instance, axis_index, direction
+                                        ),
+                                        format!(
+                                            "{} {} - {} {} (Axis {})",
+                                            device_type_name,
+                                            sc_instance,
+                                            axis_name,
+                                            direction_symbol,
+                                            axis_index
+                                        ),
+                                    )
+                                };
+
                                 Some(DetectedInput {
-                                    input_string: format!(
-                                        "{}{}_axis{}_{}",
-                                        device_prefix, sc_instance, axis_index, direction
-                                    ),
-                                    display_name: format!(
-                                        "{} {} - {} {} (Axis {})",
-                                        device_type_name,
-                                        sc_instance,
-                                        axis_name,
-                                        direction_symbol,
-                                        axis_index
-                                    ),
+                                    input_string,
+                                    display_name,
                                     device_type: device_type_name.to_string(),
                                     axis_value: Some(value),
                                     modifiers: get_active_modifiers(),
@@ -2256,6 +2451,76 @@ pub fn wait_for_inputs_with_events(
 
                             eprintln!("[HID Detection] Axis moved: HID usage ID {} ({}) -> DirectInput axis {} -> Display: {} {} (Axis {})",
                                 axis_id, axis_name, axis_index, axis_name, direction_symbol, axis_index);
+
+                            // Check if this is a hat switch (HID Usage ID 0x39 = 57)
+                            if axis_id == 57 || axis_id == 0x39 {
+                                eprintln!("[HID Detection] HAT SWITCH detected! axis_id: {}, axis_index: {}, current_value: {}, logical_min: {}, logical_max: {}", 
+                                    axis_id, axis_index, current_value, logical_min, logical_max);
+
+                                // Hat switches report discrete direction values
+                                // Common encoding: 0=up, 2=right, 4=down, 6=left, 8/15=centered
+                                // Some use: 0=up, 1=up-right, 2=right, 3=down-right, 4=down, 5=down-left, 6=left, 7=up-left
+                                let hat_direction = match current_value {
+                                    0 => "up",
+                                    1 => "up",    // up-right, use just up
+                                    2 => "right",
+                                    3 => "right", // down-right, use just right
+                                    4 => "down",
+                                    5 => "down",  // down-left, use just down
+                                    6 => "left",
+                                    7 => "left",  // up-left, use just left
+                                    8 | 15 => {
+                                        eprintln!("[HID Detection] Hat switch centered (value: {}), skipping", current_value);
+                                        continue; // Centered position
+                                    }
+                                    _ => {
+                                        eprintln!("[HID Detection] Unknown hat switch value: {}, skipping", current_value);
+                                        continue;
+                                    }
+                                };
+
+                                eprintln!("[HID Detection] Hat direction: {} -> js{}_hat1_{}", hat_direction, device_instance, hat_direction);
+
+                                let input = DetectedInput {
+                                    input_string: format!(
+                                        "js{}_hat1_{}",
+                                        device_instance, hat_direction
+                                    ),
+                                    display_name: format!(
+                                        "Joystick {} - Hat 1 {}",
+                                        device_instance,
+                                        hat_direction.to_uppercase()
+                                    ),
+                                    device_type: "Joystick".to_string(),
+                                    axis_value: Some(normalized),
+                                    modifiers: get_active_modifiers(),
+                                    is_modifier: false,
+                                    session_id: session_id.clone(),
+                                    device_uuid: Some(format!(
+                                        "{:04x}:{:04x}",
+                                        device.vendor_id, device.product_id
+                                    )),
+                                    raw_axis_code: Some(format!(
+                                        "HID Usage ID: {} (Hat Switch)",
+                                        axis_id
+                                    )),
+                                    raw_button_code: None,
+                                    raw_code_index: Some(axis_index),
+                                    device_name: Some(device_name.to_string()),
+                                    device_gilrs_id: None,
+                                    device_power_info: None,
+                                    device_is_ff_supported: None,
+                                    all_device_axes: None,
+                                    all_device_buttons: None,
+                                    hid_usage_id: Some(axis_id),
+                                    hid_axis_name: Some(axis_name.to_string()),
+                                };
+                                let _ = window.emit("input-detected", &input);
+                                if first_input_time.is_none() {
+                                    first_input_time = Some(Instant::now());
+                                }
+                                continue; // Skip the regular axis handling
+                            }
 
                             let input = DetectedInput {
                                 input_string: format!(

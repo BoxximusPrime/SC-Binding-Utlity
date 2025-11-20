@@ -2747,16 +2747,29 @@ async function startBinding(actionMapName, actionName, actionDisplayName)
       let scFormattedInput;
       if (result.hid_axis_name && mappedInput.includes('_axis'))
       {
-        // Use the actual HID axis name from the device descriptor
-        // Convert HID axis name to lowercase SC format (Rz -> rotz, X -> x, etc.)
-        const hidName = result.hid_axis_name.toLowerCase();
-        const scAxisName = hidName === 'rx' ? 'rotx' : 
-                           hidName === 'ry' ? 'roty' : 
-                           hidName === 'rz' ? 'rotz' : hidName;
-        
-        // Replace axis number format with axis name format
-        scFormattedInput = mappedInput.replace(/axis\d+(?:_(positive|negative))?/, scAxisName);
-        console.log(`Converted to SC format using HID axis name "${result.hid_axis_name}":`, scFormattedInput);
+        // Check if this is a hat switch (backend should already have converted it, but check name just in case)
+        const hidNameLower = result.hid_axis_name.toLowerCase().replace(/\s+/g, '');
+
+        if (hidNameLower === 'hatswitch')
+        {
+          // This is a hat switch - backend should have already converted it to hat format
+          // If it didn't, use the mappedInput as-is
+          scFormattedInput = toStarCitizenFormat(mappedInput);
+          console.log('Hat switch detected in HID name, using standard format:', scFormattedInput);
+        }
+        else
+        {
+          // Use the actual HID axis name from the device descriptor
+          // Convert HID axis name to lowercase SC format (Rz -> rotz, X -> x, etc.)
+          const hidName = result.hid_axis_name.toLowerCase();
+          const scAxisName = hidName === 'rx' ? 'rotx' :
+            hidName === 'ry' ? 'roty' :
+              hidName === 'rz' ? 'rotz' : hidName;
+
+          // Replace axis number format with axis name format
+          scFormattedInput = mappedInput.replace(/axis\d+(?:_(positive|negative))?/, scAxisName);
+          console.log(`Converted to SC format using HID axis name "${result.hid_axis_name}":`, scFormattedInput);
+        }
       }
       else
       {

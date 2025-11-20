@@ -102,7 +102,7 @@ impl Rebind {
         // Examples: "kb_ ", "kb_", "js1_ ", "mouse1_", "gp1_ "
         if let Some(after_underscore_pos) = input.find('_') {
             let after_underscore = &input[after_underscore_pos + 1..];
-            
+
             // If everything after the underscore is whitespace or empty, it's unbound
             if after_underscore.trim().is_empty() {
                 return InputType::Unknown;
@@ -220,11 +220,27 @@ impl Rebind {
     /// Format binding name to be more readable
     fn format_binding(binding: &str) -> String {
         let clean = binding.trim();
+
+        // Handle button inputs: "button3" -> "Button 3"
         if clean.starts_with("button") {
             if let Some(num) = clean.strip_prefix("button") {
                 return format!("Button {}", num.trim());
             }
         }
+
+        // Handle hat switch inputs: "hat1_up" -> "Hat 1 Up"
+        if clean.starts_with("hat") {
+            // Extract hat number and direction
+            if let Some(rest) = clean.strip_prefix("hat") {
+                if let Some((num, direction)) = rest.split_once('_') {
+                    let direction_cap =
+                        direction.chars().next().unwrap().to_uppercase().to_string()
+                            + &direction[1..];
+                    return format!("Hat {} {}", num.trim(), direction_cap);
+                }
+            }
+        }
+
         clean.replace('_', " ").to_uppercase()
     }
 }
