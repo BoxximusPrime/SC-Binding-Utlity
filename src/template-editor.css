@@ -1,7 +1,7 @@
 /* Quick Tips */
 .quick-tips {
     position: absolute;
-    top: 1rem;
+    top: 6rem;
     right: 1rem;
     color: var(--text-primary);
     font-size: 0.9rem;
@@ -453,6 +453,7 @@
     position: absolute;
     top: 1rem;
     left: 1rem;
+    right: 1rem;
     background: rgba(var(--accent-primary-rgb), 0.05);
     backdrop-filter: blur(10px);
     border: 1px solid var(--bg-lighter);
@@ -463,6 +464,7 @@
     gap: 0.5rem;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     z-index: 100;
+    justify-content: space-between;
 }
 
 .template-controls-panel .control-group {
@@ -748,4 +750,58 @@
 .highlight-pulse {
     animation: highlightPulse 1s ease-in-out 3;
     border-color: var(--accent-primary) !important;
+}
+
+/* Save Notification */
+.template-save-notification {
+    position: fixed;
+    top: 20px;
+    right: 340px;
+    /* Position to the right of the sidebar */
+    padding: 1rem 1.5rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: rgba(78, 201, 176, 0.95);
+    color: white;
+    border: 1px solid #4ec9b0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    animation: slideInRight 0.3s ease-out;
+    max-width: 400px;
+}
+
+.template-save-notification .notification-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.template-save-notification .notification-message {
+    flex: 1;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.template-save-notification.fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        transform: translateX(20px);
+    }
 }

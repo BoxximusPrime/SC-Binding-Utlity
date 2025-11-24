@@ -14,7 +14,11 @@ import
     drawButtonMarker,
     drawButtonBox,
     getHat4WayPositions,
+    getHat2WayVerticalPositions,
+    getHat2WayHorizontalPositions,
     drawHat4WayBoxes,
+    drawHat2WayVerticalBoxes,
+    drawHat2WayHorizontalBoxes,
     roundRect
 } from './button-renderer.js';
 import { toStarCitizenFormat } from './input-utils.js';
@@ -281,6 +285,37 @@ window.initializeVisualView = function ()
             }
         }
     });
+
+    // Listen for storage events from template editor (cross-tab communication)
+    window.addEventListener('storage', (event) =>
+    {
+        if (event.key === 'editorCurrentTemplate' && event.newValue)
+        {
+            // Template editor saved a template - check if it matches our current template
+            try
+            {
+                const savedTemplate = JSON.parse(event.newValue);
+                const savedFileName = localStorage.getItem('editorTemplateFileName');
+                const viewerFileName = localStorage.getItem('viewerTemplateFileName');
+
+                // If the saved template matches what we're viewing, auto-reload it
+                if (viewerFileName && savedFileName && viewerFileName === savedFileName)
+                {
+                    console.log(`[VIEWER] Template "${savedFileName}" was updated in editor, auto-reloading...`);
+                    currentTemplate = normalizeTemplateData(savedTemplate);
+                    ViewerState.save('viewerCurrentTemplate', currentTemplate);
+                    displayTemplate();
+
+                    // Set flag to notify editor that viewer was updated
+                    localStorage.setItem('viewerWasUpdated', 'true');
+                }
+            }
+            catch (error)
+            {
+                console.error('[VIEWER] Error processing storage event:', error);
+            }
+        }
+    });
 };
 
 function initializeEventListeners()
@@ -441,18 +476,12 @@ async function onTemplateFileSelected(e)
         // Persist to localStorage using viewer-specific keys
         ViewerState.save('viewerCurrentTemplate', templateData);
         localStorage.setItem('viewerTemplateFileName', file.name);
+        localStorage.setItem('viewerTemplateFilePath', file.name); // Store just filename for viewer
 
-        // Update header template name using viewer-specific function
-        console.log('onTemplateFileSelected - templateData.name:', templateData.name);
-        console.log('window.updateViewerTemplateIndicator exists:', typeof window.updateViewerTemplateIndicator);
-        if (window.updateViewerTemplateIndicator)
+        // Update file indicator
+        if (window.updateViewerFileIndicator)
         {
-            console.log('Calling updateViewerTemplateIndicator with:', templateData.name, file.name);
-            window.updateViewerTemplateIndicator(templateData.name, file.name);
-        }
-        else
-        {
-            console.log('window.updateViewerTemplateIndicator is not available');
+            window.updateViewerFileIndicator(file.name);
         }
 
         displayTemplate();
@@ -587,14 +616,23 @@ function loadPersistedTemplate()
                 currentPageIndex = 0;
             }
 
-            // Update header template name using viewer-specific indicator function
+            // Update file indicator with saved filename
             const savedFileName = localStorage.getItem('viewerTemplateFileName');
-            if (window.updateViewerTemplateIndicator)
+            if (savedFileName && window.updateViewerFileIndicator)
             {
-                window.updateViewerTemplateIndicator(currentTemplate.name, savedFileName);
+                window.updateViewerFileIndicator(savedFileName);
+            }
+            else if (window.showNoTemplateIndicator)
+            {
+                window.showNoTemplateIndicator();
             }
 
             displayTemplate();
+        }
+        else if (window.showNoTemplateIndicator)
+        {
+            // No template loaded - show no template indicator
+            window.showNoTemplateIndicator();
         }
     } catch (error)
     {
@@ -954,10 +992,18 @@ function drawButtons(img, mode = DrawMode.NORMAL)
     // Second pass: draw all buttons/markers/boxes
     buttons.forEach(button =>
     {
-        // Check if this is a 4-way hat
+        // Check if this is a hat
         if (button.buttonType === 'hat4way')
         {
             drawHat4Way(button, mode);
+        }
+        else if (button.buttonType === 'hat2way-vertical')
+        {
+            drawHat2WayVertical(button, mode);
+        }
+        else if (button.buttonType === 'hat2way-horizontal')
+        {
+            drawHat2WayHorizontal(button, mode);
         }
         else
         {
@@ -971,8 +1017,25 @@ function drawConnectingLineForButton(button, mode = DrawMode.NORMAL)
 {
     if (mode === DrawMode.BOUNDS_ONLY) return; // Skip lines in bounds-only mode
 
-    const isHat = button.buttonType === 'hat4way';
-    const bindings = isHat ? findAllBindingsForHatDirection(button, 'up') : findAllBindingsForButton(button);
+    const isHat = button.buttonType && button.buttonType.startsWith('hat');
+    let bindings;
+
+    if (button.buttonType === 'hat4way')
+    {
+        bindings = findAllBindingsForHatDirection(button, 'up');
+    }
+    else if (button.buttonType === 'hat2way-vertical')
+    {
+        bindings = findAllBindingsForHatDirection(button, 'up');
+    }
+    else if (button.buttonType === 'hat2way-horizontal')
+    {
+        bindings = findAllBindingsForHatDirection(button, 'left');
+    }
+    else
+    {
+        bindings = findAllBindingsForButton(button);
+    }
 
     const accentPrimary = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim();
     const textMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
@@ -1117,6 +1180,188 @@ function drawHat4Way(hat, mode = DrawMode.NORMAL)
     });
 }
 
+function drawHat2WayVertical(hat, mode = DrawMode.NORMAL)
+{
+    // Hat has 3 directions: up, down, push
+    const directions = ['up', 'down', 'push'];
+
+    // Check if push button exists
+    const hasPush = hat.inputs && hat.inputs['push'];
+
+    // Use centralized position calculation
+    const positions = getHat2WayVerticalPositions(hat.labelPos.x, hat.labelPos.y, hasPush);
+
+    // Only track bounds in bounds mode
+    if (mode === DrawMode.BOUNDS_ONLY)
+    {
+        updateBounds(hat.buttonPos.x, hat.buttonPos.y, 12, 12);
+        directions.forEach(dir =>
+        {
+            if (hat.inputs && hat.inputs[dir])
+            {
+                const pos = positions[dir];
+                updateBounds(pos.x, pos.y, HatFrameWidth, HatFrameHeight);
+            }
+        });
+
+        const boxHalfHeight = HatFrameHeight / 2;
+        const verticalDistanceWithPush = boxHalfHeight + HatSpacing + boxHalfHeight;
+        const verticalDistanceNoPush = (HatFrameHeight + HatSpacing) / 2;
+        const verticalDistance = hasPush ? verticalDistanceWithPush + (HatSpacing + HatSpacing / 2) : verticalDistanceNoPush + HatSpacing;
+        const titleGap = 12;
+        const titleY = hat.labelPos.y - verticalDistance - boxHalfHeight - titleGap;
+
+        const textWidth = 60;
+        updateBounds(hat.labelPos.x, titleY, textWidth, 13);
+        return;
+    }
+
+    // Draw center point marker
+    drawButtonMarker(ctx, hat.buttonPos, 1, false, true);
+
+    // Callback to register clickable boxes
+    const onClickableBox = (box) =>
+    {
+        if (mode === DrawMode.NORMAL)
+        {
+            clickableBoxes.push(box);
+        }
+    };
+
+    // Store bindings by direction
+    const bindingsByDirection = {};
+    directions.forEach(dir =>
+    {
+        if (hat.inputs && hat.inputs[dir])
+        {
+            bindingsByDirection[dir] = findAllBindingsForHatDirection(hat, dir);
+        }
+    });
+
+    // Use unified rendering function with joystick viewer styling
+    drawHat2WayVerticalBoxes(ctx, hat, {
+        mode: mode,
+        alpha: 1,
+        getContentForDirection: (dir, input) =>
+        {
+            const bindings = bindingsByDirection[dir] || [];
+            return bindings.map(binding =>
+            {
+                let actionLabel = binding.actionLabel || binding.action;
+                if (binding.multiTap && binding.multiTap > 1)
+                {
+                    actionLabel += ` (${binding.multiTap}x)`;
+                }
+
+                if (binding.isDefault)
+                {
+                    return `[muted]${actionLabel}`;
+                }
+                return `[action]${actionLabel}`;
+            });
+        },
+        colors: {
+            titleColor: '#aaa',
+            contentColor: '#ddd',
+            subtleColor: '#999',
+            mutedColor: '#888',
+            actionColor: '#7dd3c0'
+        },
+        onClickableBox: onClickableBox,
+        bindingsByDirection: bindingsByDirection,
+        buttonDataForDirection: (dir) => ({ ...hat, direction: dir })
+    });
+}
+
+function drawHat2WayHorizontal(hat, mode = DrawMode.NORMAL)
+{
+    // Hat has 3 directions: left, right, push
+    const directions = ['left', 'right', 'push'];
+
+    // Check if push button exists
+    const hasPush = hat.inputs && hat.inputs['push'];
+
+    // Use centralized position calculation
+    const positions = getHat2WayHorizontalPositions(hat.labelPos.x, hat.labelPos.y, hasPush);
+
+    // Only track bounds in bounds mode
+    if (mode === DrawMode.BOUNDS_ONLY)
+    {
+        updateBounds(hat.buttonPos.x, hat.buttonPos.y, 12, 12);
+        directions.forEach(dir =>
+        {
+            if (hat.inputs && hat.inputs[dir])
+            {
+                const pos = positions[dir];
+                updateBounds(pos.x, pos.y, HatFrameWidth, HatFrameHeight);
+            }
+        });
+
+        const titleGap = 12;
+        const titleY = hat.labelPos.y - HatFrameHeight - HatSpacing - titleGap;
+
+        const textWidth = 60;
+        updateBounds(hat.labelPos.x, titleY, textWidth, 13);
+        return;
+    }
+
+    // Draw center point marker
+    drawButtonMarker(ctx, hat.buttonPos, 1, false, true);
+
+    // Callback to register clickable boxes
+    const onClickableBox = (box) =>
+    {
+        if (mode === DrawMode.NORMAL)
+        {
+            clickableBoxes.push(box);
+        }
+    };
+
+    // Store bindings by direction
+    const bindingsByDirection = {};
+    directions.forEach(dir =>
+    {
+        if (hat.inputs && hat.inputs[dir])
+        {
+            bindingsByDirection[dir] = findAllBindingsForHatDirection(hat, dir);
+        }
+    });
+
+    // Use unified rendering function with joystick viewer styling
+    drawHat2WayHorizontalBoxes(ctx, hat, {
+        mode: mode,
+        alpha: 1,
+        getContentForDirection: (dir, input) =>
+        {
+            const bindings = bindingsByDirection[dir] || [];
+            return bindings.map(binding =>
+            {
+                let actionLabel = binding.actionLabel || binding.action;
+                if (binding.multiTap && binding.multiTap > 1)
+                {
+                    actionLabel += ` (${binding.multiTap}x)`;
+                }
+
+                if (binding.isDefault)
+                {
+                    return `[muted]${actionLabel}`;
+                }
+                return `[action]${actionLabel}`;
+            });
+        },
+        colors: {
+            titleColor: '#aaa',
+            contentColor: '#ddd',
+            subtleColor: '#999',
+            mutedColor: '#888',
+            actionColor: '#7dd3c0'
+        },
+        onClickableBox: onClickableBox,
+        bindingsByDirection: bindingsByDirection,
+        buttonDataForDirection: (dir) => ({ ...hat, direction: dir })
+    });
+}
+
 // Local wrapper for shared drawBindingBox to handle clickable tracking and bounds
 function drawBindingBoxLocal(x, y, label, bindings, compact = false, buttonData = null, mode = DrawMode.NORMAL)
 {
@@ -1240,21 +1485,28 @@ function extractButtonIdentifier(button, direction = null)
         }
         else if (typeof main === 'string')
         {
-            // For v1.1+ templates, buttons don't have prefixes, so we prepend the devicePrefix
-            const withPrefix = main.includes('_') ? main : `${devicePrefix}_${main}`;
-            inputString = normalizeInputStringForStick(withPrefix, jsPrefix);
-        }
-        {
-            inputString = normalizeInputStringForStick(main, jsPrefix);
+            // Check if this is an axis name (x, y, z, rotx, roty, rotz, slider1, slider2)
+            if (main.match(/^(x|y|z|rotx|roty|rotz|slider1|slider2)$/i))
+            {
+                // Axis name - construct the full input string directly
+                inputString = `${jsPrefix}${main.toLowerCase()}`;
+            }
+            else
+            {
+                // Button or other input - prepend devicePrefix if not already present
+                const withPrefix = main.includes('_') ? main : `${devicePrefix}_${main}`;
+                inputString = normalizeInputStringForStick(withPrefix, jsPrefix);
+            }
         }
     }
     else if (button.inputType === 'axis' && button.inputId !== undefined && button.inputId !== null)
     {
         // inputId might be a number (legacy: 1, 2, 3) or a string (new: "x", "y", "z")
-        if (typeof button.inputId === 'string' && button.inputId.match(/^(x|y|z|rotx|roty|rotz|slider)$/i))
+        if (typeof button.inputId === 'string' && button.inputId.match(/^(x|y|z|rotx|roty|rotz|slider1|slider2)$/i))
         {
-            // Already a Star Citizen axis name
-            inputString = normalizeInputStringForStick(`${devicePrefix}_${button.inputId.toLowerCase()}`, jsPrefix);
+            // Already a Star Citizen axis name - construct the full input string
+            const axisName = button.inputId.toLowerCase();
+            inputString = `${jsPrefix}${axisName}`;
         }
         else
         {
@@ -1344,6 +1596,21 @@ function searchBindings(buttonIdentifier)
                     if (inputString && (input === inputString || input.startsWith(inputString + '_')))
                     {
                         isMatch = true;
+                    }
+                    // For axis bindings, also try matching just the axis name (to handle default bindings)
+                    // Default bindings from AllBinds.xml are hardcoded to js1_ in the backend,
+                    // but they should apply to all joystick instances
+                    else if (inputString && inputString.match(/_(?:x|y|z|rotx|roty|rotz|slider1|slider2)$/))
+                    {
+                        // Extract just the axis name from our inputString (e.g., "js2_x" -> "x")
+                        const ourAxisName = inputString.split('_').pop();
+                        // Extract axis name from the binding (e.g., "js1_x" -> "x")
+                        const bindingAxisName = input.split('_').pop();
+                        // If the axis names match and it's a default binding, consider it a match
+                        if (ourAxisName === bindingAxisName && binding.is_default)
+                        {
+                            isMatch = true;
+                        }
                     }
                     // Match by button number - BUT ONLY FOR ACTUAL BUTTONS, NOT AXES
                     // This prevents "axis2" from incorrectly matching "button2"
@@ -1797,16 +2064,27 @@ window.findButtonNameForInput = function (inputString)
                 }
                 else if (typeof main === 'string')
                 {
-                    // For v1.1+ templates, prepend devicePrefix if not already present
-                    const withPrefix = main.includes('_') ? main : `${devicePrefix}_${main}`;
-                    calculatedInputString = normalizeInputStringForStick(withPrefix, jsPrefix);
+                    // Check if this is an axis name
+                    if (main.match(/^(x|y|z|rotx|roty|rotz|slider1|slider2)$/i))
+                    {
+                        // Axis name - construct directly
+                        calculatedInputString = `${jsPrefix}${main.toLowerCase()}`;
+                    }
+                    else
+                    {
+                        // Button or other input - prepend devicePrefix if not already present
+                        const withPrefix = main.includes('_') ? main : `${devicePrefix}_${main}`;
+                        calculatedInputString = normalizeInputStringForStick(withPrefix, jsPrefix);
+                    }
                 }
             }
             else if (button.inputType === 'axis' && button.inputId !== undefined && button.inputId !== null)
             {
-                if (typeof button.inputId === 'string' && button.inputId.match(/^(x|y|z|rotx|roty|rotz|slider)$/i))
+                if (typeof button.inputId === 'string' && button.inputId.match(/^(x|y|z|rotx|roty|rotz|slider1|slider2)$/i))
                 {
-                    calculatedInputString = normalizeInputStringForStick(`${devicePrefix}_${button.inputId.toLowerCase()}`, jsPrefix);
+                    // Axis name format - construct the full input string directly
+                    const axisName = button.inputId.toLowerCase();
+                    calculatedInputString = `${jsPrefix}${axisName}`;
                 }
                 else
                 {
@@ -1855,6 +2133,28 @@ window.findButtonNameForInput = function (inputString)
                     if (checkMatch(button, jsNum, dir))
                     {
                         return `${button.name} [${dir.charAt(0).toUpperCase() + dir.slice(1)}]`;
+                    }
+                }
+            }
+            else if (button.buttonType === 'hat2way-vertical')
+            {
+                const directions = ['up', 'down', 'push'];
+                for (const dir of directions)
+                {
+                    if (checkMatch(button, jsNum, dir))
+                    {
+                        return `${button.name} [${dir.charAt(0).toUpperCase() + dir.slice(1)}]`;
+                    }
+                }
+            }
+            else if (button.buttonType === 'hat2way-horizontal')
+            {
+                const directions = ['left', 'right', 'push'];
+                for (const dir of directions)
+                {
+                    if (checkMatch(button, jsNum, dir))
+                    {
+                        return `${button.name} [${dir === 'left' ? '◄' : (dir === 'right' ? '►' : 'Push')}]`;
                     }
                 }
             }
@@ -2043,3 +2343,47 @@ async function exportToImage()
         btn.disabled = false;
     }
 }
+
+// ============================================================================
+// VIEWER FILE INDICATOR MANAGEMENT
+// ============================================================================
+
+/**
+ * Update the viewer file indicator with the given file name
+ * @param {string} fileName - Name of the template file
+ */
+function updateViewerFileIndicator(fileName)
+{
+    const indicator = document.getElementById('viewer-file-indicator');
+    const filePathEl = document.getElementById('viewer-file-path');
+    const fileNameEl = document.getElementById('viewer-file-name');
+
+    if (!indicator || !filePathEl || !fileNameEl) return;
+
+    // For viewer, we only have filename (no full path)
+    filePathEl.textContent = '';
+    fileNameEl.textContent = fileName;
+    fileNameEl.title = fileName;
+    indicator.style.display = 'flex';
+}
+
+/**
+ * Show the no template indicator
+ */
+function showNoTemplateIndicator()
+{
+    const indicator = document.getElementById('viewer-file-indicator');
+    const filePathEl = document.getElementById('viewer-file-path');
+    const fileNameEl = document.getElementById('viewer-file-name');
+
+    if (!indicator || !filePathEl || !fileNameEl) return;
+
+    filePathEl.textContent = '';
+    fileNameEl.textContent = 'No Template';
+    fileNameEl.title = 'No template loaded';
+    indicator.style.display = 'flex';
+}
+
+// Export functions for global use
+window.updateViewerFileIndicator = updateViewerFileIndicator;
+window.showNoTemplateIndicator = showNoTemplateIndicator;

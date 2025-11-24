@@ -565,17 +565,27 @@ impl InputDetector {
 
                         let change_abs = (current_value as i32 - prev_value as i32).abs() as f32;
 
-                        // Use absolute threshold like the HID debugger does
-                        // This works across all bit depths (10-bit, 12-bit, 16-bit, etc.)
+                        // Hat switch check (HID Usage ID 0x39 = 57)
+                        // Hat switches need special handling - they should detect any value change
+                        let is_hat_switch = axis_id == 0x39;
+
+                        // For hat switches, trigger on any non-zero change
+                        // For regular axes, use absolute threshold
                         const AXIS_CHANGE_THRESHOLD: f32 = 50.0; // Absolute value change needed
 
-                        if change_abs >= AXIS_CHANGE_THRESHOLD {
+                        let should_detect = if is_hat_switch {
+                            change_abs > 0.0 // Any change triggers detection for hat switches
+                        } else {
+                            change_abs >= AXIS_CHANGE_THRESHOLD
+                        };
+
+                        if should_detect {
                             // Normalize to -1.0 to 1.0 for all checks
                             let normalized =
                                 ((current_value as i32 - logical_min) as f32 / range * 2.0) - 1.0;
 
                             // Hat switch check (HID Usage ID 0x39 = 57)
-                            if axis_id == 0x39 {
+                            if is_hat_switch {
                                 let axis_name = current_report
                                     .axis_names
                                     .get(&axis_id)

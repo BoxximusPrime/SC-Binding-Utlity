@@ -1,10 +1,15 @@
 :root {
-  /* Theme: Scifi / CRT (Default) */
-  --crt-color: #10b981;
-  --danger-color: #ef4444;
-  --bg-color: #0f172a;
+  /* ============================================================================
+     THEME 1: Scifi / CRT (Default) - Emerald Green Accent
+     ============================================================================ */
 
-  /* Mapped Variables */
+  /* Base Colors */
+  --primary-accent: #10b981;
+  --primary-accent-hover: #34d399;
+  --primary-accent-active: #059669;
+  --danger-color: #ef4444;
+
+  /* Background Palette */
   --bg-darkest: #000000;
   --bg-dark: #050b14;
   --bg-medium: #0f172a;
@@ -13,33 +18,85 @@
   --bg-lighter: #334155;
   --bg-modal: #121214;
 
-  --accent-primary: var(--crt-color);
-  --accent-hover: #34d399;
-  --accent-active: #059669;
+  /* Accent Colors */
+  --accent-primary: var(--primary-accent);
+  --accent-hover: var(--primary-accent-hover);
+  --accent-active: var(--primary-accent-active);
   --accent-subtle: rgba(16, 185, 129, 0.15);
   --accent-primary-rgb: 16, 185, 129;
 
+  /* Status Colors */
   --status-warning: #f59e0b;
   --status-danger: var(--danger-color);
-  --status-success: var(--crt-color);
+  --status-success: var(--primary-accent);
 
-  --text-primary: var(--crt-color);
+  /* Text Colors */
+  --text-primary: #c7c7c7;
   --text-secondary: #94a3b8;
+  --text-accent: var(--primary-accent);
   --text-muted: #64748b;
   --text-inverse: #000000;
 
-  /* Button Variables - Refactored */
-  --button-bg: rgba(16, 185, 129, 0.1);
-  --button-border: var(--crt-color);
-  --button-text: var(--crt-color);
-
-  --button-hover-bg: var(--crt-color);
-  --button-hover-border: var(--crt-color);
+  /* Button Colors - Base Style */
+  --button-bg: rgba(16, 185, 129, 1);
+  --button-border: var(--primary-accent);
+  --button-text: var(--primary-accent);
+  --button-hover-bg: var(--primary-accent);
+  --button-hover-border: var(--primary-accent);
   --button-hover-text: #000000;
 
-  --button-primary-bg: var(--crt-color);
+  /* Button Colors - Primary Variant */
+  --button-primary-bg: var(--primary-accent);
   --button-primary-text: #000000;
-  --button-primary-hover-bg: #34d399;
+  --button-primary-hover-bg: var(--primary-accent-hover);
+  --button-primary-hover-text: #000000;
+
+  /* Button Colors - Secondary Variant */
+  --button-secondary-bg: #1e293b;
+  --button-secondary-border: #334155;
+  --button-secondary-text: #94a3b8;
+  --button-secondary-hover-bg: #1e293b;
+  --button-secondary-hover-border: #94a3b8;
+  --button-secondary-hover-text: #c7c7c7;
+
+  /* Button Colors - Dark Variant */
+  --button-dark-bg: #000000;
+  --button-dark-border: #334155;
+  --button-dark-text: #94a3b8;
+  --button-dark-hover-bg: #050b14;
+  --button-dark-hover-border: #34d399;
+  --button-dark-hover-text: #c7c7c7;
+
+  /* Button Colors - Danger Variant */
+  --button-danger-bg: #ef4444;
+  --button-danger-text: #ffffff;
+  --button-danger-hover-bg: #dc2626;
+  --button-danger-hover-text: #ffffff;
+
+  /* Button Colors - Success Variant */
+  --button-success-bg: var(--primary-accent);
+  --button-success-text: #000000;
+  --button-success-hover-bg: var(--primary-accent-hover);
+  --button-success-hover-text: #000000;
+  --button-success-color: #000000;
+
+  /* Button Colors - Accent Variant */
+  --button-accent-bg: var(--primary-accent);
+  --button-accent-border: var(--primary-accent);
+  --button-accent-text: #000000;
+  --button-accent-hover-bg: var(--primary-accent-hover);
+  --button-accent-hover-border: var(--primary-accent-hover);
+  --button-accent-hover-text: #000000;
+
+  /* Button Styling */
+  --button-rounded-radius: 4px;
+
+  /* Dropdown/Select Colors */
+  --dropdown-bg: var(--bg-medium);
+  --dropdown-border: var(--bg-light);
+  --dropdown-text: var(--text-primary);
+  --dropdown-hover-bg: var(--bg-light);
+  --dropdown-hover-border: var(--accent-primary);
 
   /* Typography */
   font-family: 'Share Tech Mono', monospace;
@@ -60,50 +117,104 @@
 
 /* VS Code Dark Theme - Alternative Theme */
 :root.theme-red {
-  /* Color Theme - Matching VS Code Dark Theme */
+  /* ============================================================================
+     THEME 2: VS Code Dark - Rust Red Accent
+     ============================================================================ */
+
+  /* Base Colors */
+  --primary-accent: #d9534f;
+  --primary-accent-hover: #e67e72;
+  --primary-accent-active: #c74444;
+  --danger-color: #d9534f;
+
+  /* Background Palette */
   --bg-darkest: #000000;
   --bg-dark: #0c0f11;
   --bg-medium: #0c0f11;
   --bg-medium-light: #20252b;
   --bg-light: #1c232b;
-  --bg-lighter: #1f2529;
-  --bg-modal: #0e0e0e;
+  --bg-lighter: #343b40;
+  --bg-modal: #1a1a1b;
 
-  --accent-primary: #d9534f;
-  --accent-hover: #e67e72;
-  --accent-active: #c74444;
-  --accent-warning: #ce9178;
+  /* Accent Colors */
+  --accent-primary: var(--primary-accent);
+  --accent-hover: var(--primary-accent-hover);
+  --accent-active: var(--primary-accent-active);
+  --accent-subtle: rgba(217, 83, 79, 0.15);
+  --accent-primary-rgb: 217, 83, 79;
 
-  --text-primary: #979797;
+  /* Status Colors */
+  --status-warning: #ce9178;
+  --status-danger: var(--danger-color);
+  --status-success: #5cb85c;
+
+  /* Text Colors */
+  --text-primary: #c7c7c7;
   --text-secondary: #a0a0a0;
+  --text-accent: #b64d4d;
   --text-muted: #858585;
+  --text-inverse: #000000;
 
+  /* Button Colors - Base Style */
   --button-bg: #2d2d2d;
   --button-border: #4d4d4d;
   --button-text: #cccccc;
-
   --button-hover-bg: #3a3a3a;
   --button-hover-border: #666666;
   --button-hover-text: #ffffff;
 
+  /* Button Colors - Primary Variant */
+  --button-primary-bg: #d9534f;
+  --button-primary-text: #ffffff;
+  --button-primary-hover-bg: #e67e72;
+  --button-primary-hover-text: #ffffff;
+
+  /* Button Colors - Secondary Variant */
+  --button-secondary-bg: #3a3a3a;
+  --button-secondary-border: #4d4d4d;
+  --button-secondary-text: #a0a0a0;
+  --button-secondary-hover-bg: #474747;
+  --button-secondary-hover-border: #666666;
+  --button-secondary-hover-text: #ffffff;
+
+  /* Button Colors - Dark Variant */
   --button-dark-bg: #333333;
   --button-dark-border: #4d4d4d;
   --button-dark-text: #cccccc;
-
   --button-dark-hover-bg: #444444;
   --button-dark-hover-border: #5e5e5e;
   --button-dark-hover-text: #ffffff;
 
-  --status-warning: #ce9178;
-  --status-danger: #d9534f;
-  --status-success: #d9534f;
+  /* Button Colors - Danger Variant */
+  --button-danger-bg: #d9534f;
+  --button-danger-text: #ffffff;
+  --button-danger-hover-bg: #c74444;
+  --button-danger-hover-text: #ffffff;
 
-  --accent-subtle: rgba(217, 83, 79, 0.15);
-  --accent-primary-rgb: 217, 83, 79;
+  /* Button Colors - Success Variant */
+  --button-success-bg: #5cb85c;
+  --button-success-text: #ffffff;
+  --button-success-hover-bg: #4aa64a;
+  --button-success-hover-text: #ffffff;
+  --button-success-color: #ffffff;
 
-  --button-primary-bg: #4d4d4d;
-  --button-primary-hover-bg: #666666;
-  --button-primary-text: #ffffff;
+  /* Button Colors - Accent Variant */
+  --button-accent-bg: #d9534f;
+  --button-accent-border: #d9534f;
+  --button-accent-text: #ffffff;
+  --button-accent-hover-bg: #e67e72;
+  --button-accent-hover-border: #e67e72;
+  --button-accent-hover-text: #ffffff;
+
+  /* Button Styling */
+  --button-rounded-radius: 4px;
+
+  /* Dropdown/Select Colors */
+  --dropdown-bg: #3a3a3a;
+  --dropdown-border: #4d4d4d;
+  --dropdown-text: #cccccc;
+  --dropdown-hover-bg: #474747;
+  --dropdown-hover-border: #d9534f;
 
   /* Typography */
   font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
@@ -199,19 +310,19 @@ body {
 
 .btn-action {
   transition: all 0.1s ease;
-  border: 1px solid #10b981;
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+  background: rgba(var(--accent-primary-rgb), 0.1);
 }
 
 .btn-action:hover:not(:disabled) {
-  background: #10b981;
-  color: #000;
-  box-shadow: 0 0 10px #10b981;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  box-shadow: 0 0 10px var(--accent-primary);
 }
 
 .btn-action:disabled {
-  border-color: #334155;
+  border-color: var(--bg-lighter);
   color: #475569;
   background: rgba(0, 0, 0, 0.2);
   cursor: not-allowed;
@@ -360,6 +471,7 @@ button {
   border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.2s ease;
 }
 
 button:hover {
@@ -403,9 +515,9 @@ input::placeholder {
 
 /* Select Dropdowns */
 select {
-  background-color: var(--bg-medium);
-  color: var(--text-primary);
-  border: 1px solid var(--bg-light);
+  background-color: var(--dropdown-bg);
+  color: var(--dropdown-text);
+  border: 1px solid var(--dropdown-border);
   padding: 0.75rem;
   font-size: 0.95rem;
   font-family: inherit;
@@ -421,14 +533,15 @@ select {
 }
 
 select:hover {
-  border-color: var(--accent-primary);
-  background-color: var(--bg-light);
+  border-color: var(--dropdown-hover-border);
+  background-color: var(--dropdown-hover-bg);
+  color: var(--dropdown-text);
 }
 
 select:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  border-color: var(--dropdown-hover-border);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
 }
 
 select:disabled {
@@ -438,20 +551,20 @@ select:disabled {
 
 /* Select option styling (limited by browser, but we can do what we can) */
 select option {
-  background-color: var(--bg-medium);
-  color: var(--text-primary);
+  background-color: var(--dropdown-bg);
+  color: var(--dropdown-text);
   padding: 0.5rem;
 }
 
 select option:hover {
-  background-color: var(--bg-light);
-  color: var(--accent-primary);
+  background-color: var(--dropdown-hover-bg);
+  color: var(--dropdown-text);
 }
 
 select option:checked {
-  background: linear-gradient(var(--bg-light), var(--bg-light));
-  background-color: var(--bg-dark);
-  color: var(--text-primary);
+  background: linear-gradient(var(--dropdown-hover-bg), var(--dropdown-hover-bg));
+  background-color: var(--dropdown-bg);
+  color: var(--dropdown-text);
 }
 
 
@@ -746,33 +859,6 @@ p[style*="color: red"] {
   border-top: 1px solid rgb(255 255 255 / 11%);
 }
 
-.header-template-info {
-  display: none;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 1rem;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.header-template-info #header-template-name {
-  color: var(--text-primary);
-}
-
-/* Show template info only on visual and template tabs */
-.tab-content.active[id="tab-content-bindings"]~.app-header .header-template-info,
-.tab-content.active[id="tab-content-template"]~.app-header .header-template-info {
-  display: flex;
-}
-
-/* Alternative approach: use JavaScript to control visibility based on active tab */
-body.tab-bindings .header-template-info,
-body.tab-template .header-template-info {
-  display: flex !important;
-}
-
 .header-tabs {
   display: flex;
   gap: 0.5rem;
@@ -829,10 +915,30 @@ body.tab-template .header-template-info {
 
 .bindings-sub-nav-right {
   display: flex;
-  gap: 0.5rem;
+  gap: 1rem;
   align-items: center;
   padding: 0.5rem 1rem;
   flex-shrink: 0;
+}
+
+.bindings-header-section {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0 1.8rem 0 1.0rem;
+  border-right: 1px solid var(--bg-light);
+}
+
+.bindings-header-section:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+.template-loaded-label {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .bindings-view-btn {
@@ -871,25 +977,43 @@ body.tab-template .header-template-info {
 .loaded-file-indicator-sub {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background-color: var(--bg-dark);
-  border: 1px solid var(--bg-light);
+  background-color: var(--bg-light);
+  border: 1px solid var(--bg-lighter);
   border-radius: 4px;
   font-size: 0.85rem;
   color: var(--text-secondary);
-  max-width: 250px;
+  min-width: 0;
 }
 
 .loaded-file-indicator-sub .file-icon {
   font-size: 1rem;
+  flex-shrink: 0;
 }
 
-.loaded-file-indicator-sub #loaded-file-name-sub {
+.loaded-file-path {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.85rem;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.loaded-file-name {
+  font-weight: 900;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+/* Unsaved indicator styles */
+.loaded-file-indicator.unsaved {
+  border-color: var(--status-warning);
+  background-color: rgba(206, 145, 120, 0.1);
+}
+
+.loaded-file-indicator-sub.unsaved {
+  border-color: var(--status-warning);
+  background-color: rgba(206, 145, 120, 0.1);
 }
 
 /* Bindings View Containers */
@@ -1019,6 +1143,67 @@ body.tab-template .header-template-info {
 
 .checkbox-container:hover label {
   color: var(--text-primary);
+}
+
+/* Auto Save Checkbox Styling */
+.auto-save-checkbox-container {
+  padding: 1rem;
+  background: var(--bg-light);
+  border: 2px solid var(--bg-lighter);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  align-items: center;
+}
+
+.auto-save-checkbox-container:hover {
+  border-color: var(--accent-primary);
+  background: rgba(var(--accent-primary-rgb), 0.05);
+}
+
+.auto-save-checkbox-label {
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+}
+
+.auto-save-checkbox-label input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 1px solid var(--text-muted);
+  border-radius: 4px;
+  background-color: transparent;
+  position: relative;
+  transition: all 0.2s ease;
+  accent-color: var(--accent-primary);
+  vertical-align: middle;
+}
+
+.auto-save-checkbox-label input[type="checkbox"]:hover {
+  border-color: var(--accent-primary);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.auto-save-checkbox-label input[type="checkbox"]:checked {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.auto-save-checkbox-label .checkbox-text {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 /* Custom Checkbox Styling */
@@ -1211,7 +1396,7 @@ input[type="checkbox"]:disabled:hover {
 
 .bindings-header {
   padding: 1.5rem 2rem;
-  background-color: var(--bg-darkest);
+  background-color: var(--bg-dark);
   /* Removed border-bottom for cleaner look, maybe add sticky behavior later */
   display: flex;
   justify-content: space-between;
@@ -1238,8 +1423,8 @@ input[type="checkbox"]:disabled:hover {
   padding: 0.6rem 1rem;
   padding-right: 2.5rem;
   font-size: 0.9rem;
-  background-color: var(--bg-dark);
-  border: 1px solid transparent;
+  background-color: var(--bg-light);
+  border: 1px solid var(--bg-lighter);
   border-radius: 99px;
   color: var(--text-primary);
   transition: all 0.2s ease;
@@ -1380,11 +1565,12 @@ input[type="checkbox"]:disabled:hover {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
   font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .btn-bind:hover {
   background-color: var(--accent-primary);
-  color: var(--bg-darkest);
+  color: var(--text-inverse);
   border-color: var(--accent-primary);
 }
 
@@ -1392,6 +1578,7 @@ input[type="checkbox"]:disabled:hover {
   background-color: transparent;
   border-color: transparent;
   color: var(--text-muted);
+  transition: all 0.2s ease;
 }
 
 .btn-reset:hover {
@@ -1404,6 +1591,7 @@ input[type="checkbox"]:disabled:hover {
   border-color: transparent;
   color: var(--status-danger);
   opacity: 0.8;
+  transition: all 0.2s ease;
 }
 
 .btn-clear:hover {
@@ -1416,6 +1604,7 @@ input[type="checkbox"]:disabled:hover {
   background-color: transparent;
   border-color: transparent;
   color: var(--text-muted);
+  transition: all 0.2s ease;
 }
 
 .btn-manage:hover {
@@ -1593,7 +1782,7 @@ input[type="checkbox"]:disabled:hover {
   font-weight: 500;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1606,33 +1795,65 @@ input[type="checkbox"]:disabled:hover {
 }
 
 .btn-sm.active {
-  background-color: var(--primary-color) !important;
-  border-color: var(--primary-color) !important;
-  color: white !important;
+  background-color: var(--button-primary-bg) !important;
+  border-color: var(--button-primary-bg) !important;
+  color: var(--button-primary-text) !important;
 }
 
 .btn-secondary {
-  background-color: var(--bg-light);
-  border-color: var(--bg-lighter);
-  color: var(--text-secondary);
+  background-color: var(--button-secondary-bg);
+  border-color: var(--button-secondary-border);
+  color: var(--button-secondary-text);
+  border-radius: var(--button-rounded-radius);
+  transition: all 0.2s ease;
 }
 
 .btn-secondary:hover {
-  background-color: var(--bg-light);
-  border-color: var(--text-secondary);
-  color: var(--text-primary);
+  background-color: var(--button-secondary-hover-bg);
+  border-color: var(--button-secondary-hover-border);
+  color: var(--button-secondary-hover-text);
+}
+
+.btn-primary {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border-color: var(--button-primary-bg);
+  border-radius: var(--button-rounded-radius);
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--button-primary-hover-bg);
+  border-color: var(--button-primary-hover-bg);
+  color: var(--button-primary-hover-text);
+}
+
+.btn-danger {
+  background-color: var(--button-danger-bg);
+  color: var(--button-danger-text);
+  border-color: var(--button-danger-bg);
+  border-radius: var(--button-rounded-radius);
+  transition: all 0.2s ease;
+}
+
+.btn-danger:hover {
+  background-color: var(--button-danger-hover-bg);
+  border-color: var(--button-danger-hover-bg);
+  color: var(--button-danger-hover-text);
 }
 
 .btn-success {
-  background-color: var(--status-success);
-  border-color: var(--status-success);
-  color: white;
+  background-color: var(--button-success-bg);
+  border-color: var(--button-success-bg);
+  color: var(--button-success-text);
+  border-radius: var(--button-rounded-radius);
+  transition: all 0.2s ease;
 }
 
 .btn-success:hover:not(:disabled) {
-  background-color: #34d399;
-  border-color: #34d399;
-  color: #fff;
+  background-color: var(--button-success-hover-bg);
+  border-color: var(--button-success-hover-bg);
+  color: var(--button-success-hover-text);
 }
 
 .btn-success:disabled {
@@ -1640,9 +1861,24 @@ input[type="checkbox"]:disabled:hover {
   cursor: not-allowed;
 }
 
+.btn-accent {
+  background-color: var(--button-accent-bg);
+  border-color: var(--button-accent-border);
+  color: var(--button-accent-text);
+  border-radius: var(--button-rounded-radius);
+  transition: all 0.2s ease;
+}
+
+.btn-accent:hover {
+  background-color: var(--button-accent-hover-bg);
+  border-color: var(--button-accent-hover-border);
+  color: var(--button-accent-hover-text);
+}
+
 .btn-large {
   padding: 1rem 2rem;
   font-size: 1.1rem;
+  border-radius: var(--button-rounded-radius);
 }
 
 
@@ -1762,16 +1998,15 @@ input[type="checkbox"]:disabled:hover {
 
 .activation-mode-select {
   width: 100%;
-  padding: 0.5rem;
+  padding: 1.2rem;
   font-size: 1rem;
   border-radius: 4px;
-  border: 1px solid var(--bg-lighter);
-  background: var(--bg-darkest);
-  color: var(--text-primary);
+  border: 1px solid var(--dropdown-border);
+  background: var(--dropdown-bg);
+  color: var(--dropdown-text);
   font-family: inherit;
   cursor: pointer;
   transition: all 0.2s;
-  padding: 1.2rem;
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a0a0a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
@@ -1781,14 +2016,14 @@ input[type="checkbox"]:disabled:hover {
 }
 
 .activation-mode-select:hover {
-  border-color: var(--accent-primary);
-  background-color: var(--bg-light);
+  border-color: var(--dropdown-hover-border);
+  background-color: var(--dropdown-hover-bg);
 }
 
 .activation-mode-select:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  border-color: var(--dropdown-hover-border);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
 }
 
 /* Binding Conflict Display */
@@ -1977,7 +2212,7 @@ input[type="checkbox"]:disabled:hover {
 .modal-close {
   background: none;
   border: none;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0;
@@ -1992,6 +2227,7 @@ input[type="checkbox"]:disabled:hover {
 
 .modal-close:hover {
   background: var(--bg-light);
+  color: var(--text-primary);
 }
 
 .modal-body {
@@ -2027,7 +2263,7 @@ input[type="checkbox"]:disabled:hover {
   margin: 0 0 1.25rem 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 2px solid var(--bg-light);
@@ -2051,32 +2287,32 @@ input[type="checkbox"]:disabled:hover {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
   color: var(--text-primary);
   font-weight: 500;
 }
 
 .modal-content input,
 .modal-content select {
-  background-color: var(--bg-medium);
-  color: var(--text-primary);
-  border: 1px solid var(--bg-light);
+  background-color: var(--dropdown-bg);
+  color: var(--dropdown-text);
+  border: 1px solid var(--dropdown-border);
   padding: 0.75rem;
   border-radius: 4px;
   font-family: inherit;
+  transition: all 0.2s;
 }
 
 .modal-content input:focus,
 .modal-content select:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  border-color: var(--dropdown-hover-border);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
 }
 
-.modal-content input,
+.modal-content input:hover,
 .modal-content select:hover {
-  border-color: var(--accent-primary);
-  background-color: var(--bg-light);
+  border-color: var(--dropdown-hover-border);
+  background-color: var(--dropdown-hover-bg);
 }
 
 /* Button ID Display Box */
@@ -2316,23 +2552,31 @@ input[type="checkbox"]:disabled:hover {
 }
 
 .joystick-mapping-controls select {
-  background: var(--bg-dark);
-  color: var(--text-primary);
-  border: 1px solid var(--button-border);
+  background: var(--dropdown-bg);
+  color: var(--dropdown-text);
+  border: 1px solid var(--dropdown-border);
   border-radius: 4px;
   padding: 0.5rem;
   font-size: 0.9rem;
   cursor: pointer;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1em 1em;
+  padding-right: 2rem;
 }
 
 .joystick-mapping-controls select:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--dropdown-hover-border);
+  background-color: var(--dropdown-hover-bg);
 }
 
 .joystick-mapping-controls select:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  border-color: var(--dropdown-hover-border);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
 }
 
 .no-joysticks {
@@ -2373,40 +2617,46 @@ input[type="checkbox"]:disabled:hover {
   background-color: var(--button-primary-bg);
   color: var(--button-primary-text);
   border-color: var(--button-primary-bg);
+  border-radius: var(--button-rounded-radius);
+  transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
   background-color: var(--button-primary-hover-bg);
   border-color: var(--button-primary-hover-bg);
-  color: #fff;
+  color: var(--button-primary-hover-text);
 }
 
 .btn-danger {
-  background-color: var(--status-danger);
-  color: white;
-  border-color: var(--status-danger);
+  background-color: var(--button-danger-bg);
+  color: var(--button-danger-text);
+  border-color: var(--button-danger-bg);
+  border-radius: var(--button-rounded-radius);
+  transition: all 0.2s ease;
 }
 
 .btn-danger:hover {
-  background-color: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
+  background-color: var(--button-danger-hover-bg);
+  border-color: var(--button-danger-hover-bg);
+  color: var(--button-danger-hover-text);
 }
 
 .btn-accent {
-  background-color: var(--button-bg);
-  border-color: var(--button-border);
-  color: #ffffff;
+  background-color: var(--button-accent-bg);
+  border-color: var(--button-accent-border);
+  color: var(--button-accent-text);
+  transition: all 0.2s ease;
 }
 
 .btn-accent:hover {
-  background-color: var(--button-hover-bg);
-  border-color: var(--button-hover-border);
-  color: #ffffff;
+  background-color: var(--button-accent-hover-bg);
+  border-color: var(--button-accent-hover-border);
+  color: var(--button-accent-hover-text);
 }
 
 .joystick-test-btn {
   white-space: nowrap;
+  transition: all 0.2s ease;
 }
 
 .joystick-test-btn.active {
@@ -2530,7 +2780,6 @@ input[type="checkbox"]:disabled:hover {
 
 .confirmation-modal-content .modal-body {
   padding: 2rem 1.5rem;
-  background: linear-gradient(180deg, var(--bg-light) 0%, rgba(22, 26, 31, 0.8) 100%);
 }
 
 .confirmation-modal-content .modal-body p {
@@ -2542,7 +2791,6 @@ input[type="checkbox"]:disabled:hover {
 }
 
 .confirmation-modal-content .modal-footer {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.2) 0%, transparent 100%);
   border-top: 1px solid var(--bg-lighter);
   padding: 1.5rem;
   gap: 0.75rem;
@@ -2558,27 +2806,42 @@ input[type="checkbox"]:disabled:hover {
 
 .confirmation-modal-content .btn-secondary {
   background-color: var(--button-dark-bg);
+  border-color: var(--button-dark-border);
+  color: var(--button-dark-text);
+}
+
+.confirmation-modal-content .btn-secondary:hover {
+  background-color: var(--button-dark-hover-bg);
+  border-color: var(--button-dark-hover-border);
+  color: var(--button-dark-hover-text);
 }
 
 .confirmation-modal-content .btn-primary {
-  background-color: var(--button-bg);
-  border-color: var(--button-border);
-  box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+  background-color: var(--button-primary-bg);
+  border-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  box-shadow: 0 0 15px rgba(var(--accent-primary-rgb), 0.2);
 }
 
 .confirmation-modal-content .btn-primary:hover {
-  box-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
+  background-color: var(--button-primary-hover-bg);
+  border-color: var(--button-primary-hover-bg);
+  color: var(--button-primary-hover-text);
+  box-shadow: 0 0 25px rgba(var(--accent-primary-rgb), 0.4);
   transform: translateY(-2px);
 }
 
 .confirmation-modal-content .btn-danger {
-  background-color: var(--status-danger);
-  border-color: var(--status-danger);
+  background-color: var(--button-danger-bg);
+  border-color: var(--button-danger-bg);
+  color: var(--button-danger-text);
   box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
 }
 
 .confirmation-modal-content .btn-danger:hover {
-  background-color: #dc2626;
+  background-color: var(--button-danger-hover-bg);
+  border-color: var(--button-danger-hover-bg);
+  color: var(--button-danger-hover-text);
   box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
   transform: translateY(-2px);
 }
@@ -2674,7 +2937,7 @@ input[type="checkbox"]:disabled:hover {
 .btn-close {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-secondary);
   font-size: 1.5em;
   cursor: pointer;
   padding: 0;
@@ -2688,8 +2951,8 @@ input[type="checkbox"]:disabled:hover {
 }
 
 .btn-close:hover {
-  background: #444;
-  color: #fff;
+  background: var(--bg-light);
+  color: var(--text-primary);
 }
 
 .modal-body {
@@ -3125,14 +3388,13 @@ input[type="checkbox"]:disabled:hover {
   gap: 1rem;
   align-items: center;
   padding: 1rem;
-  background: var(--bg-medium);
-  border: 1px solid var(--bg-light);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
   border-left: 2px solid var(--status-success);
 }
 
 .action-binding-item:hover {
-  background: var(--bg-light);
+  background: rgba(255, 255, 255, 0.1);
   border-color: var(--bg-lighter);
 }
 
@@ -3184,15 +3446,23 @@ input[type="checkbox"]:disabled:hover {
   padding: 0.4rem 0.6rem;
   font-size: 0.9rem;
   border-radius: 4px;
-  border: 1px solid var(--bg-lighter);
-  background: var(--bg-dark);
-  color: var(--text-primary);
+  border: 1px solid var(--dropdown-border);
+  background: var(--dropdown-bg);
+  color: var(--dropdown-text);
   cursor: pointer;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.4rem center;
+  background-size: 1em 1em;
+  padding-right: 1.8rem;
 }
 
 .action-binding-activation select:focus {
   outline: none;
-  border-color: var(--accent-primary);
+  border-color: var(--dropdown-hover-border);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
 }
 
 .action-binding-remove {
@@ -3433,11 +3703,6 @@ input[type="checkbox"]:disabled:hover {
 
 .welcome-footer strong {
   color: var(--accent-primary);
-}
-
-/* Tab visibility for welcome tab */
-body.tab-welcome .header-template-info {
-  display: none;
 }
 
 /* Theme Switcher Button */

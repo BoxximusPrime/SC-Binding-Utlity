@@ -43,6 +43,7 @@
   <script type="module" src="/theme-switcher.js" defer></script>
   <script type="module" src="/button-renderer.js" defer></script>
   <script type="module" src="/main.js" defer></script>
+  <script type="module" src="/keybindings-page.js" defer></script>
   <script type="module" src="/joystick-viewer.js" defer></script>
   <script type="module" src="/template-editor.js" defer></script>
   <script type="module" src="/input-debugger.js" defer></script>
@@ -58,7 +59,7 @@
       <!-- Header Row 1 -->
       <div class="header-row-1">
         <div class="header-logo">
-          <h1>Star-Nexus<span id="app-version">v0.9.0</span></h1>
+          <h1>Bind Citizen<span id="app-version">v0.9.0</span></h1>
           <div id="update-info" class="header-update-info"></div>
         </div>
         <button id="theme-switcher" class="theme-switcher" title="Switch theme">
@@ -81,10 +82,6 @@
           <button id="kofi-header-btn" class="tab-btn tab-kofi-btn" type="button" title="Support on Ko-fi">
             <img src="./assets/kofi_symbol.png" alt="Ko-fi" class="kofi-header-icon">
           </button>
-        </div>
-        <div class="header-template-info">
-          <span>Template:</span>
-          <span id="header-template-name">Untitled Template</span>
         </div>
       </div>
     </header>
@@ -146,14 +143,13 @@
           <div class="welcome-section">
             <h2>🚀 Getting Started</h2>
             <ol class="welcome-steps">
-              <li><strong>Configure Your Devices:</strong> Click the "⚙️ Set Joystick Remapping" button in the
-                Keybindings
-                tab to remap your physical devices (optional)</li>
-              <li><strong>Load Your Bindings:</strong> Click "Load" to import your existing Star Citizen keybindings
-                file</li>
-              <li><strong>Edit & Save:</strong> Make changes and save them back to your game directory</li>
+              <li><strong>Configure Your Devices:</strong> Click the device manager tab, and adjust your device prefix
+                settings as needed.</li>
+              <li><strong>Load Your Bindings:</strong> Hop on over to the bindings tab and click "Load" to import your
+                existing Star Citizen keybindings file.</li>
+              <li><strong>Edit & Save:</strong> Make changes and save them back to your game directory.</li>
               <li><strong>Explore Visual View:</strong> Select a template to see your bindings visualized on your
-                joystick</li>
+                joystick.</li>
             </ol>
           </div>
 
@@ -185,18 +181,32 @@
             </button>
           </div>
           <div class="bindings-sub-nav-right">
-            <div id="loaded-file-indicator-sub" class="loaded-file-indicator-sub">
-              <span class="file-icon">📄</span>
-              <span id="loaded-file-name-sub">layout_NewBindings_exported.xml</span>
+            <!-- File Status Section -->
+            <div class="bindings-header-section">
+              <span class="template-loaded-label">Keybindings loaded:</span>
+              <div id="loaded-file-indicator-sub" class="loaded-file-indicator-sub">
+                <span class="file-icon">📄</span>
+                <span id="loaded-file-path-sub" class="loaded-file-path"></span>
+                <span id="loaded-file-name-sub" class="loaded-file-name">layout_NewBindings_exported.xml</span>
+              </div>
             </div>
-            <button id="sc-directory-btn" class="btn btn-secondary btn-sm"
-              title="Configure Star Citizen installation directory"><span id="sc-directory-icon">⚙️</span>
-              Auto Save Settings</button>
-            <button id="load-btn" class="btn btn-secondary btn-sm">Load</button>
-            <button id="save-as-btn" class="btn btn-secondary btn-sm" disabled>Save As...</button>
-            <button id="save-btn" class="btn btn-success btn-sm" disabled>💾 Save</button>
-            <button id="copy-command-btn" class="btn btn-secondary btn-sm" title="Copy rebind command to clipboard"
-              style="display: none;">📋</button>
+
+            <!-- File Operations Section -->
+            <div class="bindings-header-section">
+              <button id="new-keybinding-btn" class="btn btn-secondary btn-sm">New</button>
+              <button id="load-btn" class="btn btn-secondary btn-sm">Load</button>
+              <button id="save-as-btn" class="btn btn-secondary btn-sm" disabled>Save As...</button>
+              <button id="save-btn" class="btn btn-success btn-sm" disabled>Save</button>
+            </div>
+
+            <!-- Settings Section -->
+            <div class="bindings-header-section">
+              <button id="sc-directory-btn" class="btn btn-secondary btn-sm"
+                title="Configure Star Citizen installation directory"><span id="sc-directory-icon">⚙️</span>
+                Auto Save Settings</button>
+              <button id="copy-command-btn" class="btn btn-secondary btn-sm" title="Copy rebind command to clipboard"
+                style="display: none;">📋</button>
+            </div>
           </div>
         </div>
 
@@ -208,8 +218,6 @@
             <aside class="sidebar">
               <div class="filter-section">
                 <h3>Actions</h3>
-                <button id="new-keybinding-btn" class="btn btn-secondary" style="width: 100%;">📝
-                  New Keybinding Set</button>
                 <button id="clear-sc-binds-btn" class="btn btn-secondary" style="width: 100%;">🗑️ Clear SC
                   Binds</button>
                 <button id="configure-joystick-mapping-btn" class="btn btn-secondary" style="width: 100%;">⚙️ Manage
@@ -328,6 +336,15 @@
 
                 <div class="control-divider"></div>
 
+                <!-- Template File Indicator -->
+                <div id="viewer-file-indicator" class="loaded-file-indicator-sub" style="display: none;">
+                  <span class="file-icon">📄</span>
+                  <span id="viewer-file-path" class="loaded-file-path"></span>
+                  <span id="viewer-file-name" class="loaded-file-name">No Template</span>
+                </div>
+
+                <div class="control-divider"></div>
+
                 <!-- Filter Controls -->
                 <div class="control-group">
                   <button id="hide-defaults-toggle" class="control-btn" title="Hide Default Bindings">
@@ -406,13 +423,20 @@
             </div>
 
             <div class="section">
-              <h3>Template Devices</h3>
+              <h3>Devices</h3>
               <div id="template-pages-empty" class="empty-state-small">
                 No devices yet. Add a device for each physical stick, throttle, or pedal.
               </div>
               <div id="template-pages-list" class="template-pages-list"></div>
               <button id="add-template-page-btn" class="btn btn-secondary btn-block">+ Add Device</button>
             </div>
+
+            <div class="section" style="display:flex; flex-direction:column; gap:6px;">
+              <h3>Actions</h3>
+              <button id="clear-all-btn" class="btn btn-danger btn-block">Clear All Buttons</button>
+              <button id="mirror-template-btn" class="btn btn-secondary btn-block">🔄 Mirror Template</button>
+            </div>
+
 
             <div class="section">
               <h3>Button List</h3>
@@ -440,14 +464,6 @@
                 </ul>
               </div>
             </div>
-
-            <div class="section" style="display:flex; flex-direction:column; gap:6px;">
-              <h3>Advanced</h3>
-              <button id="clear-all-btn" class="btn btn-danger btn-block">Clear All Buttons</button>
-              <button id="mirror-template-btn" class="btn btn-secondary btn-block">🔄 Mirror Template</button>
-              <button id="change-joystick-number-btn" class="btn btn-secondary btn-block">🔢 Change All JS
-                Numbers</button>
-            </div>
           </aside>
 
           <!-- Main Panel - Canvas Editor -->
@@ -466,6 +482,13 @@
                   <div class="page-selector" id="toolbar-page-buttons">
                     <span style="font-size: 11px; color: #aaa; margin-right: 8px;">Page:</span>
                   </div>
+                </div>
+                <div class="control-divider"></div>
+                <!-- Template File Indicator -->
+                <div id="template-file-indicator" class="loaded-file-indicator-sub" style="display: none;">
+                  <span class="file-icon">📄</span>
+                  <span id="template-file-path" class="loaded-file-path"></span>
+                  <span id="template-file-name" class="loaded-file-name">Untitled Template</span>
                 </div>
                 <div class="control-divider"></div>
                 <div class="control-group">
@@ -917,10 +940,10 @@
         </div>
 
         <div id="auto-save-sc-configured" style="display: none;">
-          <div class="checkbox-container" style="margin-bottom: 1rem;">
-            <label style="display: flex; align-items: center; gap: 0.5rem;">
-              <input type="checkbox" id="auto-save-all-checkbox" style="cursor: pointer;">
-              <span>Automatically deploy to all installations when saving</span>
+          <div class="auto-save-checkbox-container">
+            <label class="auto-save-checkbox-label">
+              <input type="checkbox" id="auto-save-all-checkbox">
+              <span class="checkbox-text">Automatically deploy to all installations when saving</span>
             </label>
           </div>
 
@@ -930,6 +953,8 @@
               <li>The file name will match your currently loaded keybindings file</li>
               <li>Keybindings will be deployed to all detected installations (LIVE, PTU, etc.)</li>
               <li>You'll still need to re-import keybindings in the game client</li>
+              <li>On they keybindings page (next to this button), there's a copy command button you can use in SC to
+                import the changes.</li>
             </ul>
           </div>
 
@@ -1022,6 +1047,8 @@
         <select id="button-type-select">
           <option value="simple">Simple Button or Axis</option>
           <option value="hat4way">4-Way Hat Switch</option>
+          <option value="hat2way-vertical">2-Way Hat Switch (Up/Down)</option>
+          <option value="hat2way-horizontal">2-Way Hat Switch (Left/Right)</option>
         </select>
       </label>
 
@@ -1044,45 +1071,46 @@
       <!-- Hat switch input detection -->
       <div id="hat-input-section">
         <div class="hat-id-grid">
-          <div class="hat-id-box">
+          <div class="hat-id-box" data-hat-type="hat4way,hat2way-vertical">
             <div class="hat-id-label">⬆️ Up ID:</div>
             <div class="hat-id-display" data-direction="up">—</div>
           </div>
-          <div class="hat-id-box">
+          <div class="hat-id-box" data-hat-type="hat4way,hat2way-vertical">
             <div class="hat-id-label">⬇️ Down ID:</div>
             <div class="hat-id-display" data-direction="down">—</div>
           </div>
-          <div class="hat-id-box">
+          <div class="hat-id-box" data-hat-type="hat4way,hat2way-horizontal">
             <div class="hat-id-label">⬅️ Left ID:</div>
             <div class="hat-id-display" data-direction="left">—</div>
           </div>
-          <div class="hat-id-box">
+          <div class="hat-id-box" data-hat-type="hat4way,hat2way-horizontal">
             <div class="hat-id-label">➡️ Right ID:</div>
             <div class="hat-id-display" data-direction="right">—</div>
           </div>
         </div>
-        <div class="hat-id-box" style="margin-bottom: 1rem;">
+        <div class="hat-id-box" style="margin-bottom: 1rem;"
+          data-hat-type="hat4way,hat2way-vertical,hat2way-horizontal">
           <div class="hat-id-label">⬇️ Push ID:</div>
           <div class="hat-id-display" data-direction="push">—</div>
         </div>
         <div class="hat-button-container">
-          <div class="hat-button-group">
+          <div class="hat-button-group" data-hat-type="hat4way,hat2way-vertical">
             <button class="btn btn-secondary btn-sm hat-detect-btn" data-direction="up">⬆️ Detect Up</button>
             <button class="btn btn-secondary btn-sm hat-clear-btn" data-direction="up">✕ Clear Up</button>
           </div>
-          <div class="hat-button-group">
+          <div class="hat-button-group" data-hat-type="hat4way,hat2way-vertical">
             <button class="btn btn-secondary btn-sm hat-detect-btn" data-direction="down">⬇️ Detect Down</button>
             <button class="btn btn-secondary btn-sm hat-clear-btn" data-direction="down">✕ Clear Down</button>
           </div>
-          <div class="hat-button-group">
+          <div class="hat-button-group" data-hat-type="hat4way,hat2way-horizontal">
             <button class="btn btn-secondary btn-sm hat-detect-btn" data-direction="left">⬅️ Detect Left</button>
             <button class="btn btn-secondary btn-sm hat-clear-btn" data-direction="left">✕ Clear Left</button>
           </div>
-          <div class="hat-button-group">
+          <div class="hat-button-group" data-hat-type="hat4way,hat2way-horizontal">
             <button class="btn btn-secondary btn-sm hat-detect-btn" data-direction="right">➡️ Detect Right</button>
             <button class="btn btn-secondary btn-sm hat-clear-btn" data-direction="right">✕ Clear Right</button>
           </div>
-          <div class="hat-button-group">
+          <div class="hat-button-group" data-hat-type="hat4way,hat2way-vertical,hat2way-horizontal">
             <button class="btn btn-secondary btn-sm hat-detect-btn" data-direction="push">⬇️ Detect Push</button>
             <button class="btn btn-secondary btn-sm hat-clear-btn" data-direction="push">✕ Clear Push</button>
           </div>
@@ -1289,11 +1317,12 @@
         <div id="action-bindings-list" class="action-bindings-list">
           <!-- Bindings will be populated here -->
         </div>
+        <button id="action-bindings-add-btn" class="btn btn-success" style="margin-top:1rem;">+ Add New
+          Binding</button>
       </div>
       <div class="modal-footer">
-        <button id="action-bindings-add-btn" class="btn btn-primary">+ Add New Binding</button>
+        <button id="action-bindings-cancel-btn" class="btn btn-danger">Cancel</button>
         <button id="action-bindings-save-btn" class="btn btn-success">💾 Save Changes</button>
-        <button id="action-bindings-cancel-btn" class="btn btn-secondary">Cancel</button>
       </div>
     </div>
   </div>

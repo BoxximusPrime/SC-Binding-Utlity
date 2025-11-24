@@ -189,7 +189,8 @@ export function drawButtonBox(ctx, x, y, title, contentLines = [], compact = fal
         subtleColor = '#999',
         mutedColor = '#666',
         actionColor = null,
-        bindingsData = null
+        bindingsData = null,
+        isTemplateEditor = false
     } = options;
 
     const width = compact ? HatFrameWidth : ButtonFrameWidth;
@@ -228,7 +229,8 @@ export function drawButtonBox(ctx, x, y, title, contentLines = [], compact = fal
         contentColor,
         subtleColor,
         mutedColor,
-        actionColor
+        actionColor,
+        isTemplateEditor
     });
 }
 
@@ -252,7 +254,8 @@ export function RenderFrameText(ctx, x, y, boxWidth, boxHeight, title, contentLi
         contentColor = '#ddd',
         subtleColor = '#999',
         mutedColor = '#666',
-        actionColor = null
+        actionColor = null,
+        isTemplateEditor = false
     } = colors;
 
     // Calculate text layout metrics
@@ -289,7 +292,9 @@ export function RenderFrameText(ctx, x, y, boxWidth, boxHeight, title, contentLi
     ctx.font = `${titleFontSize} "Segoe UI", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const titleY = y - (boxHeight / 2) + (titleSpacing / 2) + padding;
+    // Move title down 4px in template editor mode for better spacing
+    const titleOffset = isTemplateEditor ? 16 : 0;
+    const titleY = y - (boxHeight / 2) + (titleSpacing / 2) + padding + titleOffset;
     const truncatedTitle = truncateText(title, ctx.font, contentWidth, true);
     ctx.fillText(truncatedTitle, x, titleY);
 
@@ -509,7 +514,7 @@ export function buildButtonLabelContent(button)
  * @param {number} alpha - Opacity (0-1)
  * @param {Object} colors - Optional color overrides
  */
-export function DrawButtonFrame(ctx, x, y, title, contentLines, compact = false, alpha = 1, colors = {})
+export function DrawButtonFrame(ctx, x, y, title, contentLines, compact = false, alpha = 1, colors = {}, isTemplateEditor = false)
 {
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -539,7 +544,8 @@ export function DrawButtonFrame(ctx, x, y, title, contentLines, compact = false,
 
     RenderFrameText(ctx, x, y, width, height, title, contentLines, compact, {
         ...defaultColors,
-        ...colors
+        ...colors,
+        isTemplateEditor
     });
 
     ctx.restore();
@@ -549,9 +555,9 @@ export function DrawButtonFrame(ctx, x, y, title, contentLines, compact = false,
  * Draw a single button label box (for template editor)
  * @deprecated Use drawLabel instead for unified rendering
  */
-export function drawButtonLabel(ctx, button, title, contentLines, alpha)
+export function drawButtonLabel(ctx, button, title, contentLines, alpha, isTemplateEditor = false)
 {
-    DrawButtonFrame(ctx, button.labelPos.x, button.labelPos.y, title, contentLines, false, alpha);
+    DrawButtonFrame(ctx, button.labelPos.x, button.labelPos.y, title, contentLines, false, alpha, {}, isTemplateEditor);
 }
 
 /**
@@ -559,10 +565,10 @@ export function drawButtonLabel(ctx, button, title, contentLines, alpha)
  * Convenience function that combines label content building and rendering
  * @deprecated Use buildButtonLabelContent + drawButtonLabel instead for better separation of concerns
  */
-export function drawSingleButtonLabel(ctx, button, alpha)
+export function drawSingleButtonLabel(ctx, button, alpha, isTemplateEditor = false)
 {
     const { title, contentLines } = buildButtonLabelContent(button);
-    drawButtonLabel(ctx, button, title, contentLines, alpha);
+    drawButtonLabel(ctx, button, title, contentLines, alpha, isTemplateEditor);
 }
 
 /**
@@ -571,8 +577,9 @@ export function drawSingleButtonLabel(ctx, button, alpha)
  */
 export function getHat4WayPositions(centerX, centerY, hasPush = false)
 {
-    let offsetY = (HatFrameHeight / 2) + (HatSpacing * 2) + (HatSpacing / 2) + (HatFrameHeight / 2);
+    let offsetY = (HatFrameHeight / 2) + (HatSpacing * 2) + (HatSpacing / 2) + (HatFrameHeight / 2) + HatSpacing / 2;
     if (!hasPush) offsetY -= HatFrameHeight / 2 + HatSpacing;
+    else offsetY += HatSpacing;
 
     return {
         'up': { x: centerX, y: centerY - offsetY },
@@ -584,12 +591,93 @@ export function getHat4WayPositions(centerX, centerY, hasPush = false)
 }
 
 /**
+ * Calculate hat positions for a 2-way vertical hat switch (Up/Down)
+ * Returns an object with positions for up and down directions
+ */
+export function getHat2WayVerticalPositions(centerX, centerY, hasPush = false)
+{
+    // For vertical: up and down boxes positioned with spacing between them
+    const verticalOffset = HatFrameHeight / 2 + HatSpacing * 2;
+
+    return {
+        'up': { x: centerX, y: centerY - verticalOffset },
+        'down': { x: centerX, y: centerY + verticalOffset },
+        'push': { x: centerX, y: centerY + HatFrameHeight + HatSpacing * 2 }
+    };
+}
+
+/**
+ * Calculate hat positions for a 2-way horizontal hat switch (Left/Right)
+ * Returns an object with positions for left and right directions
+ */
+export function getHat2WayHorizontalPositions(centerX, centerY, hasPush = false)
+{
+    // For horizontal: left and right boxes touching with spacing between
+    // If there's a push button, it goes below at centerY
+    const horizontalOffset = HatFrameWidth / 2 + HatSpacing / 2;
+
+    return {
+        'left': { x: centerX - horizontalOffset, y: centerY },
+        'right': { x: centerX + horizontalOffset, y: centerY },
+        'push': { x: centerX, y: centerY + HatFrameHeight + HatSpacing }
+    };
+}
+
+/**
  * Get box bounds for a specific hat direction
  * Useful for hit testing and bounds checking
  */
 export function getHat4WayBoxBounds(direction, centerX, centerY, hasPush = false)
 {
     const positions = getHat4WayPositions(centerX, centerY, hasPush);
+    if (!positions[direction])
+    {
+        return null;
+    }
+
+    const pos = positions[direction];
+    const halfWidth = HatFrameWidth / 2;
+    const halfHeight = HatFrameHeight / 2;
+
+    return {
+        x: pos.x - halfWidth,
+        y: pos.y - halfHeight,
+        width: HatFrameWidth,
+        height: HatFrameHeight
+    };
+}
+
+/**
+ * Get box bounds for a specific hat direction in a 2-way vertical hat
+ * Useful for hit testing and bounds checking
+ */
+export function getHat2WayVerticalBoxBounds(direction, centerX, centerY, hasPush = false)
+{
+    const positions = getHat2WayVerticalPositions(centerX, centerY, hasPush);
+    if (!positions[direction])
+    {
+        return null;
+    }
+
+    const pos = positions[direction];
+    const halfWidth = HatFrameWidth / 2;
+    const halfHeight = HatFrameHeight / 2;
+
+    return {
+        x: pos.x - halfWidth,
+        y: pos.y - halfHeight,
+        width: HatFrameWidth,
+        height: HatFrameHeight
+    };
+}
+
+/**
+ * Get box bounds for a specific hat direction in a 2-way horizontal hat
+ * Useful for hit testing and bounds checking
+ */
+export function getHat2WayHorizontalBoxBounds(direction, centerX, centerY, hasPush = false)
+{
+    const positions = getHat2WayHorizontalPositions(centerX, centerY, hasPush);
     if (!positions[direction])
     {
         return null;
@@ -629,7 +717,8 @@ export function drawHat4WayBoxes(ctx, hat, options = {})
         colors = {},
         onClickableBox = null,
         buttonDataForDirection = null,
-        bindingsByDirection = null
+        bindingsByDirection = null,
+        isTemplateEditor = false
     } = options;
 
     ctx.save();
@@ -683,7 +772,7 @@ export function drawHat4WayBoxes(ctx, hat, options = {})
         // For template mode, use unified label drawing
         if (mode === 'template')
         {
-            DrawButtonFrame(ctx, pos.x, pos.y, label, contentLines, true, alpha, colors);
+            DrawButtonFrame(ctx, pos.x, pos.y, label, contentLines, true, alpha, colors, isTemplateEditor);
         }
         else
         {
@@ -721,6 +810,7 @@ export function drawHat4WayFrames(ctx, button, alpha, handleSize, zoom)
     drawHat4WayBoxes(ctx, button, {
         mode: 'template',
         alpha: alpha,
+        isTemplateEditor: true,
         getContentForDirection: (dir, input) =>
         {
             const contentLines = [];
@@ -739,4 +829,173 @@ export function drawHat4WayFrames(ctx, button, alpha, handleSize, zoom)
             mutedColor: '#666'
         }
     });
+}
+
+/**
+ * Unified function to draw 2-way vertical hat boxes (Up/Down)
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {Object} hat - Hat button data
+ * @param {Object} options - Rendering options
+ */
+export function drawHat2WayVerticalBoxes(ctx, hat, options = {})
+{
+    const {
+        mode = 'template',
+        alpha = 1,
+        getContentForDirection = null,
+        colors = {},
+        onClickableBox = null,
+        buttonDataForDirection = null,
+        bindingsByDirection = null,
+        isTemplateEditor = false
+    } = options;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const hasPush = hat.inputs && hat.inputs['push'];
+    const positions = getHat2WayVerticalPositions(hat.labelPos.x, hat.labelPos.y, hasPush);
+
+    let offsetY = HatFrameHeight * 2;
+    if (!hasPush) offsetY -= HatFrameHeight / 2 + HatSpacing;
+
+    const titleGap = -8;
+    const titleY = hat.labelPos.y - offsetY - titleGap;
+
+    // Draw hat name above
+    ctx.fillStyle = colors.titleColor || '#aaa';
+    ctx.font = `${HatTitleFontSize} "Segoe UI", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const simplifiedName = simplifyButtonName(hat.name || 'Hat');
+    ctx.fillText(simplifiedName, hat.labelPos.x, titleY);
+
+    // Draw each direction box
+    const directions = ['up', 'down', 'push'];
+    directions.forEach(dir =>
+    {
+        // Skip push button if it doesn't have a binding
+        if (dir === 'push' && (!hat.inputs || !hat.inputs['push']))
+        {
+            return;
+        }
+
+        const pos = positions[dir];
+        const input = hat.inputs && hat.inputs[dir] ? hat.inputs[dir] : null;
+
+        let contentLines = [];
+        if (getContentForDirection && input)
+        {
+            contentLines = getContentForDirection(dir, input);
+        }
+
+        const label = dir === 'push' ? 'Push' : dir.charAt(0).toUpperCase();
+
+        if (mode === 'template')
+        {
+            DrawButtonFrame(ctx, pos.x, pos.y, label, contentLines, true, alpha, colors, isTemplateEditor);
+        }
+        else
+        {
+            const actualBindings = bindingsByDirection ? bindingsByDirection[dir] : null;
+            const boxOptions = {
+                hasBinding: contentLines.length > 0,
+                buttonData: buttonDataForDirection ? buttonDataForDirection(dir) : null,
+                mode: mode,
+                onClickableBox: onClickableBox,
+                titleColor: colors.titleColor || '#ccc',
+                contentColor: colors.contentColor || '#ddd',
+                subtleColor: colors.subtleColor || '#999',
+                mutedColor: colors.mutedColor || '#666',
+                actionColor: colors.actionColor || null,
+                bindingsData: actualBindings || contentLines
+            };
+            drawButtonBox(ctx, pos.x, pos.y, label, contentLines, true, boxOptions);
+        }
+    });
+
+    ctx.restore();
+}
+
+/**
+ * Unified function to draw 2-way horizontal hat boxes (Left/Right)
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {Object} hat - Hat button data
+ * @param {Object} options - Rendering options
+ */
+export function drawHat2WayHorizontalBoxes(ctx, hat, options = {})
+{
+    const {
+        mode = 'template',
+        alpha = 1,
+        getContentForDirection = null,
+        colors = {},
+        onClickableBox = null,
+        buttonDataForDirection = null,
+        bindingsByDirection = null,
+        isTemplateEditor = false
+    } = options;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const hasPush = hat.inputs && hat.inputs['push'];
+    const positions = getHat2WayHorizontalPositions(hat.labelPos.x, hat.labelPos.y, hasPush);
+
+    const titleGap = -8;
+    const titleY = hat.labelPos.y - HatFrameHeight - HatSpacing - titleGap;
+
+    // Draw hat name above
+    ctx.fillStyle = colors.titleColor || '#aaa';
+    ctx.font = `${HatTitleFontSize} "Segoe UI", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const simplifiedName = simplifyButtonName(hat.name || 'Hat');
+    ctx.fillText(simplifiedName, hat.labelPos.x, titleY);
+
+    // Draw each direction box
+    const directions = ['left', 'right', 'push'];
+    directions.forEach(dir =>
+    {
+        // Skip push button if it doesn't have a binding
+        if (dir === 'push' && (!hat.inputs || !hat.inputs['push']))
+        {
+            return;
+        }
+
+        const pos = positions[dir];
+        const input = hat.inputs && hat.inputs[dir] ? hat.inputs[dir] : null;
+
+        let contentLines = [];
+        if (getContentForDirection && input)
+        {
+            contentLines = getContentForDirection(dir, input);
+        }
+
+        const label = dir === 'push' ? 'Push' : (dir === 'left' ? '◄' : '►');
+
+        if (mode === 'template')
+        {
+            DrawButtonFrame(ctx, pos.x, pos.y, label, contentLines, true, alpha, colors, isTemplateEditor);
+        }
+        else
+        {
+            const actualBindings = bindingsByDirection ? bindingsByDirection[dir] : null;
+            const boxOptions = {
+                hasBinding: contentLines.length > 0,
+                buttonData: buttonDataForDirection ? buttonDataForDirection(dir) : null,
+                mode: mode,
+                onClickableBox: onClickableBox,
+                titleColor: colors.titleColor || '#ccc',
+                contentColor: colors.contentColor || '#ddd',
+                subtleColor: colors.subtleColor || '#999',
+                mutedColor: colors.mutedColor || '#666',
+                actionColor: colors.actionColor || null,
+                bindingsData: actualBindings || contentLines
+            };
+            drawButtonBox(ctx, pos.x, pos.y, label, contentLines, true, boxOptions);
+        }
+    });
+
+    ctx.restore();
 }

@@ -22,6 +22,12 @@ import
     RenderFrameText,
     getHat4WayPositions,
     getHat4WayBoxBounds,
+    getHat2WayVerticalPositions,
+    getHat2WayVerticalBoxBounds,
+    getHat2WayHorizontalPositions,
+    getHat2WayHorizontalBoxBounds,
+    drawHat2WayVerticalBoxes,
+    drawHat2WayHorizontalBoxes,
     HatFrameWidth,
     HatFrameHeight
 } from './button-renderer.js';
@@ -532,7 +538,7 @@ function initializeEventListeners()
     document.getElementById('delete-button-btn').addEventListener('click', deleteSelectedButton);
     document.getElementById('clear-all-btn').addEventListener('click', clearAllButtons);
     document.getElementById('mirror-template-btn').addEventListener('click', mirrorTemplate);
-    document.getElementById('change-joystick-number-btn').addEventListener('click', changeAllJoystickNumbers);
+
 
 
 
@@ -1150,7 +1156,10 @@ async function newTemplate()
     localStorage.removeItem('editorRightStickCamera');
     hasUnsavedChanges = false;
     currentTemplateFilePath = null; // Clear the file path for new template
-    updateUnsavedIndicator();
+    updateTemplateUnsavedIndicator();
+
+    // Show unsaved template indicator
+    showUnsavedTemplateIndicator();
 
     // Reset header template name
     if (window.updateTemplateIndicator)
@@ -1253,7 +1262,7 @@ window.setLoadedImage = function (img)
 // Helper function to draw only the connecting line for a button
 function drawConnectingLineOnly(button)
 {
-    const isHat = button.buttonType === 'hat4way';
+    const isHat = button.buttonType && button.buttonType.startsWith('hat');
     const alpha = 1.0; // Full opacity for lines in first pass
 
     ctx.save();
@@ -1267,14 +1276,26 @@ function drawConnectingLineOnly(button)
 
     if (isHat)
     {
-        // For hats, check if at least the four cardinal directions are bound
-        const hasCardinalDirections = button.inputs &&
-            button.inputs.up &&
-            button.inputs.down &&
-            button.inputs.left &&
-            button.inputs.right;
+        // For hats, check if at least some directions are bound
+        let hasBoundDirections = false;
+        if (button.buttonType === 'hat4way')
+        {
+            hasBoundDirections = button.inputs &&
+                button.inputs.up &&
+                button.inputs.down &&
+                button.inputs.left &&
+                button.inputs.right;
+        }
+        else if (button.buttonType === 'hat2way-vertical')
+        {
+            hasBoundDirections = button.inputs && button.inputs.up && button.inputs.down;
+        }
+        else if (button.buttonType === 'hat2way-horizontal')
+        {
+            hasBoundDirections = button.inputs && button.inputs.left && button.inputs.right;
+        }
 
-        lineColor = hasCardinalDirections ? accentPrimary : bgLight; // Bound color if all cardinals exist, grey otherwise
+        lineColor = hasBoundDirections ? accentPrimary : bgLight;
     }
 
     // Use shared drawConnectingLine function
@@ -1287,7 +1308,7 @@ function drawConnectingLineOnly(button)
 function drawButton(button, isTemp = false)
 {
     const alpha = isTemp ? 0.7 : 1.0;
-    const isHat = button.buttonType === 'hat4way';
+    const isHat = button.buttonType && button.buttonType.startsWith('hat');
 
     // Note: Lines are now drawn in a separate pass before this function is called
     // This ensures button frames are always drawn on top of lines
@@ -1301,13 +1322,61 @@ function drawButton(button, isTemp = false)
     // Draw label box(es) using shared functions
     if (button.labelPos)
     {
-        if (isHat)
+        if (button.buttonType === 'hat4way')
         {
             drawHat4WayFrames(ctx, button, alpha, (7 / zoom), zoom);
         }
+        else if (button.buttonType === 'hat2way-vertical')
+        {
+            drawHat2WayVerticalBoxes(ctx, button, {
+                mode: 'template',
+                alpha: alpha,
+                isTemplateEditor: true,
+                getContentForDirection: (dir, input) =>
+                {
+                    const contentLines = [];
+                    const match = input.match(/button(\d+)/i);
+                    if (match)
+                    {
+                        contentLines.push(`[subtle]Button ${match[1]}`);
+                    }
+                    return contentLines;
+                },
+                colors: {
+                    titleColor: '#aaa',
+                    contentColor: '#ddd',
+                    subtleColor: '#999',
+                    mutedColor: '#666'
+                }
+            });
+        }
+        else if (button.buttonType === 'hat2way-horizontal')
+        {
+            drawHat2WayHorizontalBoxes(ctx, button, {
+                mode: 'template',
+                alpha: alpha,
+                isTemplateEditor: true,
+                getContentForDirection: (dir, input) =>
+                {
+                    const contentLines = [];
+                    const match = input.match(/button(\d+)/i);
+                    if (match)
+                    {
+                        contentLines.push(`[subtle]Button ${match[1]}`);
+                    }
+                    return contentLines;
+                },
+                colors: {
+                    titleColor: '#aaa',
+                    contentColor: '#ddd',
+                    subtleColor: '#999',
+                    mutedColor: '#666'
+                }
+            });
+        }
         else
         {
-            drawSingleButtonLabel(ctx, button, alpha, (7 / zoom), zoom);
+            drawSingleButtonLabel(ctx, button, alpha, true);
         }
     }
 
@@ -1322,13 +1391,14 @@ function drawButton(button, isTemp = false)
         // Highlight the connecting line with hover color
         if (button.labelPos)
         {
+            const isHat = button.buttonType && button.buttonType.startsWith('hat');
             drawConnectingLine(ctx, button.buttonPos, button.labelPos, isHat ? 0 : ButtonFrameWidth / 2, accentHover, isHat);
         }
 
         // Highlight the label box border
         if (button.labelPos)
         {
-            const isHat = button.buttonType === 'hat4way';
+            const isHat = button.buttonType && button.buttonType.startsWith('hat');
 
             if (isHat)
             {
@@ -1568,13 +1638,29 @@ function findHandleAtPosition(pos)
         // Check if clicking on label box area
         if (button.labelPos)
         {
-            const isHat = button.buttonType === 'hat4way';
+            const isHat = button.buttonType && button.buttonType.startsWith('hat');
 
             if (isHat)
             {
                 // Use centralized hat position calculation
                 const hasPush = button.inputs && button.inputs['push'];
-                const directions = ['up', 'down', 'left', 'right', 'push'];
+                let directions, getBoundsFn;
+
+                if (button.buttonType === 'hat4way')
+                {
+                    directions = ['up', 'down', 'left', 'right', 'push'];
+                    getBoundsFn = getHat4WayBoxBounds;
+                }
+                else if (button.buttonType === 'hat2way-vertical')
+                {
+                    directions = ['up', 'down', 'push'];
+                    getBoundsFn = getHat2WayVerticalBoxBounds;
+                }
+                else if (button.buttonType === 'hat2way-horizontal')
+                {
+                    directions = ['left', 'right', 'push'];
+                    getBoundsFn = getHat2WayHorizontalBoxBounds;
+                }
 
                 for (const dir of directions)
                 {
@@ -1584,7 +1670,7 @@ function findHandleAtPosition(pos)
                         continue;
                     }
 
-                    const bounds = getHat4WayBoxBounds(dir, button.labelPos.x, button.labelPos.y, hasPush);
+                    const bounds = getBoundsFn(dir, button.labelPos.x, button.labelPos.y, hasPush);
                     if (bounds &&
                         pos.x >= bounds.x && pos.x <= bounds.x + bounds.width &&
                         pos.y >= bounds.y && pos.y <= bounds.y + bounds.height)
@@ -1634,10 +1720,26 @@ function findButtonAtPosition(pos)
         // Check if clicking on label box
         if (button.labelPos)
         {
-            if (button.buttonType === 'hat4way')
+            if (button.buttonType && button.buttonType.startsWith('hat'))
             {
                 const hasPush = button.inputs && button.inputs['push'];
-                const directions = ['up', 'down', 'left', 'right', 'push'];
+                let directions, getBoundsFn;
+
+                if (button.buttonType === 'hat4way')
+                {
+                    directions = ['up', 'down', 'left', 'right', 'push'];
+                    getBoundsFn = getHat4WayBoxBounds;
+                }
+                else if (button.buttonType === 'hat2way-vertical')
+                {
+                    directions = ['up', 'down', 'push'];
+                    getBoundsFn = getHat2WayVerticalBoxBounds;
+                }
+                else if (button.buttonType === 'hat2way-horizontal')
+                {
+                    directions = ['left', 'right', 'push'];
+                    getBoundsFn = getHat2WayHorizontalBoxBounds;
+                }
 
                 for (const dir of directions)
                 {
@@ -1647,7 +1749,7 @@ function findButtonAtPosition(pos)
                         continue;
                     }
 
-                    const bounds = getHat4WayBoxBounds(dir, button.labelPos.x, button.labelPos.y, hasPush);
+                    const bounds = getBoundsFn(dir, button.labelPos.x, button.labelPos.y, hasPush);
                     if (bounds &&
                         pos.x >= bounds.x && pos.x <= bounds.x + bounds.width &&
                         pos.y >= bounds.y && pos.y <= bounds.y + bounds.height)
@@ -2068,63 +2170,7 @@ async function mirrorTemplate()
 }
 
 
-async function changeAllJoystickNumbers()
-{
-    // Get current stick data
-    const currentStickData = currentStick === 'left' ? templateData.leftStick : templateData.rightStick;
-    const buttons = currentStickData.buttons;
 
-    if (buttons.length === 0)
-    {
-        await window.showAlert('No buttons in current view to update', 'No Buttons');
-        return;
-    }
-
-    // Get current joystick number and toggle it
-    const currentJsNum = currentStickData.joystickNumber || 1;
-    const targetJsNum = currentJsNum === 1 ? 2 : 1;
-
-    const confirmed = await window.showConfirmation(
-        `Change all button joystick numbers in ${currentStick} stick from js${currentJsNum} to js${targetJsNum}?`,
-        'Change Joystick Numbers',
-        'Change',
-        'Cancel'
-    );
-
-    if (!confirmed)
-    {
-        return;
-    }
-
-    // Update the stick's joystick number
-    currentStickData.joystickNumber = targetJsNum;
-
-    // Update all button inputs in the current stick
-    buttons.forEach(button =>
-    {
-        if (button.inputs)
-        {
-            Object.keys(button.inputs).forEach(key =>
-            {
-                const input = button.inputs[key];
-                if (typeof input === 'string')
-                {
-                    // Replace the old js number with the new one
-                    button.inputs[key] = input.replace(/^js[1-2]_/, `js${targetJsNum}_`);
-                }
-            });
-        }
-    });
-
-    markAsChanged();
-    updateButtonList();
-    redraw();
-
-    await window.showAlert(
-        `All buttons in ${currentStick} stick updated to use joystick ${targetJsNum}!`,
-        'Update Complete'
-    );
-}
 
 function updateButtonList()
 {
@@ -2215,7 +2261,7 @@ window.editButtonFromList = function (buttonId)
         updateSimpleInputPreview(tempButton);
     }
     // If it's a hat, populate the detected inputs
-    else if (buttonType === 'hat4way' && button.inputs)
+    else if ((buttonType === 'hat4way' || buttonType === 'hat2way-vertical' || buttonType === 'hat2way-horizontal') && button.inputs)
     {
         updateHatDetectionButtons(button.inputs);
         // Get joystick number for full ID display
@@ -2375,7 +2421,7 @@ async function saveButtonDetails()
             }
         }
         // Save hat direction IDs
-        else if (buttonType === 'hat4way')
+        else if (buttonType === 'hat4way' || buttonType === 'hat2way-vertical' || buttonType === 'hat2way-horizontal')
         {
             if (!tempButton.inputs)
             {
@@ -2500,10 +2546,13 @@ function onButtonTypeChange()
         document.getElementById('simple-input-section').style.display = 'block';
         document.getElementById('hat-input-section').style.display = 'none';
     }
-    else if (buttonType === 'hat4way')
+    else if (buttonType === 'hat4way' || buttonType === 'hat2way-vertical' || buttonType === 'hat2way-horizontal')
     {
         document.getElementById('simple-input-section').style.display = 'none';
         document.getElementById('hat-input-section').style.display = 'block';
+
+        // Update visibility of direction elements based on hat type
+        updateHatDirectionVisibility(buttonType);
 
         // Initialize inputs object if needed
         if (tempButton && !tempButton.inputs)
@@ -2519,43 +2568,97 @@ function onButtonTypeChange()
     }
 }
 
+// Helper function to update visibility of hat direction UI elements
+function updateHatDirectionVisibility(hatType)
+{
+    // Get all elements that have hat-type restrictions
+    const hatElements = document.querySelectorAll('[data-hat-type]');
+
+    hatElements.forEach(element =>
+    {
+        const allowedTypes = element.getAttribute('data-hat-type').split(',');
+        if (allowedTypes.includes(hatType))
+        {
+            element.style.display = '';  // Show element
+        }
+        else
+        {
+            element.style.display = 'none';  // Hide element
+        }
+    });
+}
+
 // Helper function to detect input with dual-stage trigger support
 // When a second button is detected before the first releases, use the second one
 async function detectInputWithDualStageSupport(sessionId, timeoutSecs = 10)
 {
-    const result = await invoke('wait_for_input_binding', {
-        timeoutSecs: timeoutSecs,
-        sessionId: sessionId.toString()
+    return new Promise((resolve) =>
+    {
+        const detectedInputs = [];
+        const collectDurationSecs = 1; // Collect inputs for 1 second after first detection (must be integer)
+
+        // Set up event listeners for input detection
+        const handleInputDetected = (event) =>
+        {
+            console.log('[DUAL-STAGE] Input detected:', event.payload.input_string);
+            detectedInputs.push(event.payload);
+        };
+
+        const handleDetectionComplete = (event) =>
+        {
+            if (event.payload.session_id !== sessionId.toString())
+            {
+                return; // Ignore events from other sessions
+            }
+
+            console.log('[DUAL-STAGE] Detection complete, received', detectedInputs.length, 'input(s)');
+
+            // Clean up listeners
+            if (window.__TAURI__)
+            {
+                window.__TAURI__.event.once('input-detected', () => { });
+                window.__TAURI__.event.once('input-detection-complete', () => { });
+            }
+
+            // Determine which input to use
+            if (detectedInputs.length === 0)
+            {
+                console.log('[DUAL-STAGE] No inputs detected');
+                resolve(null);
+            }
+            else if (detectedInputs.length === 1)
+            {
+                console.log('[DUAL-STAGE] Single input detected:', detectedInputs[0].input_string);
+                resolve(detectedInputs[0]);
+            }
+            else
+            {
+                // Multiple inputs detected - use the LAST one (second stage of trigger)
+                const lastInput = detectedInputs[detectedInputs.length - 1];
+                console.log('[DUAL-STAGE] Multiple inputs detected:', detectedInputs.map(i => i.input_string).join(', '));
+                console.log('[DUAL-STAGE] Using last input (second stage):', lastInput.input_string);
+                resolve(lastInput);
+            }
+        };
+
+        // Register event listeners
+        if (window.__TAURI__)
+        {
+            window.__TAURI__.event.listen('input-detected', handleInputDetected);
+            window.__TAURI__.event.listen('input-detection-complete', handleDetectionComplete);
+        }
+
+        // Start the detection process
+        invoke('wait_for_inputs_with_events', {
+            sessionId: sessionId.toString(),
+            initialTimeoutSecs: timeoutSecs,
+            collectDurationSecs: collectDurationSecs
+        }).catch(error =>
+        {
+            console.error('[DUAL-STAGE] Detection error:', error);
+            resolve(null);
+        });
     });
-
-    if (!result)
-    {
-        return null; // Timeout or no input
-    }
-
-    // Store the first detected input
-    const firstInput = result;
-    console.log('[DUAL-STAGE] First input detected:', firstInput.input_string);
-
-    // Wait briefly to see if a second input comes in before the first releases
-    // This is useful for dual-stage triggers
-    const dualStageWaitTime = 300; // milliseconds to wait for second input
-    const secondResult = await Promise.race([
-        invoke('wait_for_input_binding', {
-            timeoutSecs: Math.ceil(dualStageWaitTime / 1000),
-            sessionId: (sessionId + '-secondary').toString()
-        }),
-        new Promise(resolve => setTimeout(() => resolve(null), dualStageWaitTime))
-    ]);
-
-    if (secondResult && secondResult.input_string && secondResult.input_string !== firstInput.input_string)
-    {
-        console.log('[DUAL-STAGE] Second input detected while first held:', secondResult.input_string, '- using second input');
-        return secondResult; // Use the second input instead
-    }
-
-    console.log('[DUAL-STAGE] No secondary input detected, using first:', firstInput.input_string);
-    return firstInput; // Use the first input
 }
 
 // Hat switch input detection
@@ -3068,6 +3171,33 @@ function prepareSaveData()
     };
 }
 
+// Show save notification with optional viewer update status
+function showSaveNotification(viewerUpdated = false)
+{
+    const notification = document.createElement('div');
+    notification.className = 'template-save-notification';
+
+    let message = '✓ Template saved successfully';
+    if (viewerUpdated)
+    {
+        message += ' • Joystick Viewer updated';
+    }
+
+    notification.innerHTML = `
+        <span class="notification-icon">💾</span>
+        <span class="notification-message">${message}</span>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Fade out and remove after 3 seconds
+    setTimeout(() =>
+    {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
 // Helper function to save template to a given file path
 async function performSave(filePath, showNotification = true)
 {
@@ -3091,9 +3221,35 @@ async function performSave(filePath, showNotification = true)
         localStorage.setItem('editorTemplateFileName', fileName);
         localStorage.setItem('editorTemplateFilePath', filePath);
 
+        // Notify viewer tab if it has the same template open (same window)
+        // Clear any previous viewer update flag
+        localStorage.removeItem('viewerWasUpdated');
+
+        try
+        {
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'editorCurrentTemplate',
+                newValue: JSON.stringify(saveData),
+                url: window.location.href,
+                storageArea: localStorage
+            }));
+        }
+        catch (error)
+        {
+            console.error('[EDITOR] Error dispatching storage event:', error);
+        }
+
+        // Wait a moment to see if viewer responded
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const viewerUpdated = localStorage.getItem('viewerWasUpdated') === 'true';
+        localStorage.removeItem('viewerWasUpdated');
+
         // Clear unsaved changes
         hasUnsavedChanges = false;
-        updateUnsavedIndicator();
+        updateTemplateUnsavedIndicator();
+
+        // Update file indicator with path
+        updateTemplateFileIndicator(filePath);
 
         // Update header template name
         if (window.updateTemplateIndicator)
@@ -3103,7 +3259,7 @@ async function performSave(filePath, showNotification = true)
 
         if (showNotification)
         {
-            await showAlert('Template saved successfully!', 'Template Saved');
+            showSaveNotification(viewerUpdated);
         }
 
         return true;
@@ -3349,7 +3505,10 @@ async function loadTemplate()
 
         // Reset unsaved changes
         hasUnsavedChanges = false;
-        updateUnsavedIndicator();
+        updateTemplateUnsavedIndicator();
+
+        // Update file indicator with path
+        updateTemplateFileIndicator(filePath);
 
         // Update header template name
         console.log('loadTemplate - data.name:', data.name);
@@ -3612,6 +3771,16 @@ function loadPersistedTemplate()
             // Update UI
             document.getElementById('template-name').value = templateData.name;
 
+            // Update file indicator based on whether we have a saved file path
+            if (currentTemplateFilePath)
+            {
+                updateTemplateFileIndicator(currentTemplateFilePath);
+            }
+            else
+            {
+                showUnsavedTemplateIndicator();
+            }
+
             // Load the first page's image if we have pages
             if (currentPageId && templateData.pages.length > 0)
             {
@@ -3669,7 +3838,7 @@ function loadPersistedTemplate()
 function markAsChanged()
 {
     hasUnsavedChanges = true;
-    updateUnsavedIndicator();
+    updateTemplateUnsavedIndicator();
 
     // Also persist to editor-specific localStorage for recovery
     try
@@ -3685,6 +3854,81 @@ function markAsChanged()
 }
 
 window.markTemplateAsChanged = markAsChanged;
+
+// ============================================================================
+// TEMPLATE FILE INDICATOR MANAGEMENT
+// ============================================================================
+
+/**
+ * Update the template file indicator with the given file path
+ * @param {string} filePath - Full path to the template file
+ */
+function updateTemplateFileIndicator(filePath)
+{
+    const indicator = document.getElementById('template-file-indicator');
+    const filePathEl = document.getElementById('template-file-path');
+    const fileNameEl = document.getElementById('template-file-name');
+
+    if (!indicator || !filePathEl || !fileNameEl) return;
+
+    // Extract path and filename separately
+    const lastSlashIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
+    const fileName = lastSlashIndex !== -1 ? filePath.substring(lastSlashIndex + 1) : filePath;
+    const dirPath = lastSlashIndex !== -1 ? filePath.substring(0, lastSlashIndex + 1) : '';
+
+    // Update elements
+    filePathEl.textContent = dirPath;
+    fileNameEl.textContent = fileName;
+    fileNameEl.title = filePath; // Add tooltip for full path
+    indicator.style.display = 'flex';
+}
+
+/**
+ * Show the unsaved template indicator
+ */
+function showUnsavedTemplateIndicator()
+{
+    const indicator = document.getElementById('template-file-indicator');
+    const filePathEl = document.getElementById('template-file-path');
+    const fileNameEl = document.getElementById('template-file-name');
+
+    if (!indicator || !filePathEl || !fileNameEl) return;
+
+    filePathEl.textContent = '';
+    fileNameEl.textContent = 'Unsaved Template';
+    fileNameEl.title = 'This template has not been saved yet';
+    indicator.style.display = 'flex';
+}
+
+/**
+ * Update the unsaved state indicator for the template
+ */
+function updateTemplateUnsavedIndicator()
+{
+    const indicator = document.getElementById('template-file-indicator');
+    const fileNameEl = document.getElementById('template-file-name');
+
+    if (!indicator || !fileNameEl) return;
+
+    if (hasUnsavedChanges)
+    {
+        indicator.classList.add('unsaved');
+        if (!fileNameEl.textContent.includes('*'))
+        {
+            fileNameEl.textContent += ' *';
+        }
+    }
+    else
+    {
+        indicator.classList.remove('unsaved');
+        fileNameEl.textContent = fileNameEl.textContent.replace(' *', '');
+    }
+}
+
+// Export functions for use by other modules
+window.updateTemplateFileIndicator = updateTemplateFileIndicator;
+window.showUnsavedTemplateIndicator = showUnsavedTemplateIndicator;
+window.updateTemplateUnsavedIndicator = updateTemplateUnsavedIndicator;
 
 // ============================================================================
 // TEMPLATE JOYSTICK MAPPING

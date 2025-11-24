@@ -1208,8 +1208,29 @@ impl AllBinds {
 
                             // Build a set of input types we already have from user bindings
                             use std::collections::HashSet;
-                            let custom_input_types: HashSet<String> =
-                                all_bindings.iter().map(|b| b.input_type.clone()).collect();
+                            let custom_input_types: HashSet<String> = all_bindings
+                                .iter()
+                                .filter_map(|b| {
+                                    // For cleared bindings (input_type is "Unknown"), determine the actual input type from the input string
+                                    if b.input_type == "Unknown" && b.is_default {
+                                        // This is a cleared binding - extract the actual input type from the input prefix
+                                        let input_trimmed = b.input.trim();
+                                        if input_trimmed.starts_with("kb") {
+                                            Some("Keyboard".to_string())
+                                        } else if input_trimmed.starts_with("mouse") {
+                                            Some("Mouse".to_string())
+                                        } else if input_trimmed.starts_with("js") {
+                                            Some("Joystick".to_string())
+                                        } else if input_trimmed.starts_with("gp") {
+                                            Some("Gamepad".to_string())
+                                        } else {
+                                            Some(b.input_type.clone())
+                                        }
+                                    } else {
+                                        Some(b.input_type.clone())
+                                    }
+                                })
+                                .collect();
 
                             // Add keyboard default if not customized
                             if !custom_input_types.contains("Keyboard") {

@@ -19,9 +19,9 @@
 .custom-dropdown-button {
     width: 100%;
     padding: 8px 12px;
-    background-color: var(--bg-dark, #252526);
-    color: var(--text-primary, #ffffff);
-    border: 1px solid var(--border-color, #3e3e42);
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    border: 1px solid var(--bg-lighter);
     border-radius: 4px;
     font-size: 13px;
     cursor: pointer;
@@ -33,13 +33,14 @@
 }
 
 .custom-dropdown-button:hover {
-    background-color: var(--bg-light, #3e3e42);
-    border-color: var(--accent-color);
+    background-color: var(--bg-light);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
 }
 
 .custom-dropdown-button.open {
     background-color: var(--bg-light);
-    border-color: var(--accent-color);
+    border-color: var(--accent-primary);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
 }
@@ -59,7 +60,7 @@
     display: none;
     position: fixed;
     background-color: var(--bg-dark);
-    border: 1px solid #434343;
+    border: 1px solid var(--bg-lighter);
     border-radius: 4px;
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
     z-index: 10001;
@@ -72,7 +73,7 @@
     display: flex;
     align-items: stretch;
     position: relative;
-    border-bottom: 1px solid var(--bg-light, #3e3e42);
+    border-bottom: 1px solid var(--bg-light);
 }
 
 .custom-dropdown-option-container:last-child {
@@ -83,7 +84,7 @@
     flex: 1;
     padding: 10px 12px;
     background-color: transparent;
-    color: var(--text-primary, #ffffff);
+    color: var(--text-primary);
     border: none;
     text-align: left;
     cursor: pointer;
@@ -94,21 +95,21 @@
 }
 
 .custom-dropdown-option:hover {
-    background-color: var(--bg-light, #3e3e42);
+    background-color: var(--bg-medium);
 }
 
 .custom-dropdown-option.selected {
-    background-color: #6f3535;
-    color: #FFF;
+    background-color: rgba(var(--accent-primary-rgb), 0.3);
+    color: var(--accent-primary);
     font-weight: 500;
 }
 
 .custom-dropdown-tooltip {
     padding: 10px 12px;
-    background-color: var(--bg-light, #3e3e42);
-    color: var(--text-secondary, #cccccc);
+    background-color: var(--bg-light);
+    color: var(--text-secondary);
     font-size: 12px;
-    border-left: 2px solid var(--accent-color, #4a9eff);
+    border-left: 2px solid var(--accent-primary);
     line-height: 1.4;
     white-space: normal;
     max-width: 250px;
@@ -121,26 +122,26 @@
 }
 
 .custom-dropdown-menu::-webkit-scrollbar-track {
-    background: var(--bg-dark, #252526);
+    background: var(--bg-dark);
     border-radius: 4px;
 }
 
 .custom-dropdown-menu::-webkit-scrollbar-thumb {
-    background: var(--border-color, #3e3e42);
+    background: var(--bg-lighter);
     border-radius: 4px;
 }
 
 .custom-dropdown-menu::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-color, #4a9eff);
+    background: var(--accent-primary);
 }
 
 /* Hover tooltip displayed to the right of dropdown */
 .custom-dropdown-hover-tooltip {
     position: fixed;
-    background-color: var(--tooltip-bg, #1e1e1e);
-    color: var(--tooltip-text, #e0e0e0);
+    background-color: var(--bg-light);
+    color: var(--text-secondary);
     padding: 8px 12px;
-    border: 1.5px solid var(--tooltip-border);
+    border: 1.5px solid var(--accent-primary);
     border-radius: 6px;
     font-size: 12px;
     pointer-events: auto;
@@ -148,7 +149,7 @@
     z-index: 10002;
     box-shadow:
         0 8px 16px rgba(0, 0, 0, 0.5),
-        0 0 20px rgba(74, 158, 255, 0.2),
+        0 0 20px rgba(var(--accent-primary-rgb), 0.2),
         inset 0 1px 1px rgba(255, 255, 255, 0.05);
     white-space: normal;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -170,7 +171,7 @@
     top: 50%;
     margin-top: -13px;
     border: 13px solid transparent;
-    border-right-color: var(--tooltip-border, #4a9eff);
+    border-right-color: var(--accent-primary);
     margin-right: 0;
 }
 
@@ -181,5 +182,5 @@
     top: 50%;
     margin-top: -11px;
     border: 11px solid transparent;
-    border-right-color: var(--tooltip-bg, #1e1e1e);
+    border-right-color: var(--bg-light);
 }
