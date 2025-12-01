@@ -57,8 +57,6 @@ Star Citizen Joystick Mapper simplifies the complex task of configuring control 
 - **Platform**: Windows Desktop
 - **Input Handling**: DirectInput integration for joystick hardware detection
 
-## Getting Started
-
 ## Usage
 
 1. **Launch the Application**: Start the Joystick Mapper
@@ -78,9 +76,8 @@ Star Citizen Joystick Mapper simplifies the complex task of configuring control 
 - **Template Sharing**: Export and share custom templates with other players
 - **Batch Updates**: The auto-save system means changes sync instantly to your game, including multiple installs
 
-## Known Limitations
-
-- DirectInput-based joystick detection (Windows only)
+## Discord
+Feel free to join us on Discord! https://discord.gg/73uBrHtX
 
 ## AI Disclaimer
 - This utility was created with vibes and some old fashioned analog brain.
