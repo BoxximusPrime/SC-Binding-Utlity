@@ -99,6 +99,15 @@ pub struct Rebind {
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(default)]
     pub activation_mode: String,
+    // VKB layer information (not serialized to XML)
+    #[serde(skip)]
+    pub vkb_layer: Option<String>,
+    #[serde(skip)]
+    pub vkb_tempo: Option<String>,
+    #[serde(skip)]
+    pub vkb_physical_id: Option<u8>,
+    #[serde(skip)]
+    pub vkb_physical_info: Option<String>,
 }
 
 /// Parsed input type for easier filtering
@@ -557,6 +566,10 @@ impl ActionMaps {
                                     input: input.clone(),
                                     multi_tap,
                                     activation_mode: activation_mode_attr.clone(),
+                                    vkb_layer: None,
+                                    vkb_tempo: None,
+                                    vkb_physical_id: None,
+                                    vkb_physical_info: None,
                                 };
                                 let new_device_type = new_rebind.get_device_type();
 
@@ -1358,6 +1371,10 @@ impl AllBinds {
                                                         input: format!("kb_{}", default_value),
                                                         multi_tap: None,
                                                         activation_mode: String::new(),
+                                                        vkb_layer: None,
+                                                        vkb_tempo: None,
+                                                        vkb_physical_id: None,
+                                                        vkb_physical_info: None,
                                                     };
                                                     Some(rebind.get_display_name())
                                                 }
@@ -1372,6 +1389,10 @@ impl AllBinds {
                                                         input: format!("mouse1_{}", default_value),
                                                         multi_tap: None,
                                                         activation_mode: String::new(),
+                                                        vkb_layer: None,
+                                                        vkb_tempo: None,
+                                                        vkb_physical_id: None,
+                                                        vkb_physical_info: None,
                                                     };
                                                     Some(rebind.get_display_name())
                                                 }
@@ -1386,6 +1407,10 @@ impl AllBinds {
                                                         input: format!("js1_{}", default_value),
                                                         multi_tap: None,
                                                         activation_mode: String::new(),
+                                                        vkb_layer: None,
+                                                        vkb_tempo: None,
+                                                        vkb_physical_id: None,
+                                                        vkb_physical_info: None,
                                                     };
                                                     Some(rebind.get_display_name())
                                                 }
@@ -1400,6 +1425,10 @@ impl AllBinds {
                                                         input: format!("gp1_{}", default_value),
                                                         multi_tap: None,
                                                         activation_mode: String::new(),
+                                                        vkb_layer: None,
+                                                        vkb_tempo: None,
+                                                        vkb_physical_id: None,
+                                                        vkb_physical_info: None,
                                                     };
                                                     Some(rebind.get_display_name())
                                                 }
@@ -1464,6 +1493,10 @@ impl AllBinds {
                                         input: input.clone(),
                                         multi_tap: None,
                                         activation_mode: String::new(),
+                                        vkb_layer: None,
+                                        vkb_tempo: None,
+                                        vkb_physical_id: None,
+                                        vkb_physical_info: None,
                                     };
                                     let input_type = rebind.get_input_type();
                                     all_bindings.push(MergedBinding {
@@ -1488,6 +1521,10 @@ impl AllBinds {
                                         input: input.clone(),
                                         multi_tap: None,
                                         activation_mode: String::new(),
+                                        vkb_layer: None,
+                                        vkb_tempo: None,
+                                        vkb_physical_id: None,
+                                        vkb_physical_info: None,
                                     };
                                     let input_type = rebind.get_input_type();
                                     all_bindings.push(MergedBinding {
@@ -1512,6 +1549,10 @@ impl AllBinds {
                                         input: input.clone(),
                                         multi_tap: None,
                                         activation_mode: String::new(),
+                                        vkb_layer: None,
+                                        vkb_tempo: None,
+                                        vkb_physical_id: None,
+                                        vkb_physical_info: None,
                                     };
                                     let input_type = rebind.get_input_type();
                                     all_bindings.push(MergedBinding {
@@ -1536,6 +1577,10 @@ impl AllBinds {
                                         input: input.clone(),
                                         multi_tap: None,
                                         activation_mode: String::new(),
+                                        vkb_layer: None,
+                                        vkb_tempo: None,
+                                        vkb_physical_id: None,
+                                        vkb_physical_info: None,
                                     };
                                     let input_type = rebind.get_input_type();
                                     all_bindings.push(MergedBinding {
@@ -1578,6 +1623,10 @@ impl AllBinds {
                                     input: input.clone(),
                                     multi_tap: None,
                                     activation_mode: String::new(),
+                                    vkb_layer: None,
+                                    vkb_tempo: None,
+                                    vkb_physical_id: None,
+                                    vkb_physical_info: None,
                                 };
                                 let input_type = rebind.get_input_type();
                                 default_bindings.push(MergedBinding {
@@ -1600,6 +1649,10 @@ impl AllBinds {
                                     input: input.clone(),
                                     multi_tap: None,
                                     activation_mode: String::new(),
+                                    vkb_layer: None,
+                                    vkb_tempo: None,
+                                    vkb_physical_id: None,
+                                    vkb_physical_info: None,
                                 };
                                 let input_type = rebind.get_input_type();
                                 default_bindings.push(MergedBinding {
@@ -1622,6 +1675,10 @@ impl AllBinds {
                                     input: input.clone(),
                                     multi_tap: None,
                                     activation_mode: String::new(),
+                                    vkb_layer: None,
+                                    vkb_tempo: None,
+                                    vkb_physical_id: None,
+                                    vkb_physical_info: None,
                                 };
                                 let input_type = rebind.get_input_type();
                                 default_bindings.push(MergedBinding {
@@ -1644,6 +1701,10 @@ impl AllBinds {
                                     input: input.clone(),
                                     multi_tap: None,
                                     activation_mode: String::new(),
+                                    vkb_layer: None,
+                                    vkb_tempo: None,
+                                    vkb_physical_id: None,
+                                    vkb_physical_info: None,
                                 };
                                 let input_type = rebind.get_input_type();
                                 default_bindings.push(MergedBinding {

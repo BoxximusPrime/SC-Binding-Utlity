@@ -6,6 +6,7 @@ use tauri_plugin_opener::OpenerExt;
 mod directinput;
 mod hid_reader;
 mod keybindings;
+mod vkb_integration;
 
 use keybindings::{Action, ActionMap, ActionMaps, AllBinds, MergedBindings, OrganizedKeybindings};
 
@@ -49,6 +50,7 @@ struct AppState {
     current_bindings: Option<ActionMaps>,
     all_binds: Option<AllBinds>,
     current_file_name: Option<String>,
+    vkb_mappings: std::collections::HashMap<String, vkb_integration::VkbButtonInfo>,
 }
 
 impl AppState {
@@ -57,6 +59,26 @@ impl AppState {
             current_bindings: None,
             all_binds: None,
             current_file_name: None,
+            vkb_mappings: std::collections::HashMap::new(),
+        }
+    }
+}
+
+/// Annotate action maps with VKB layer information
+fn annotate_with_vkb_info(
+    action_maps: &mut ActionMaps,
+    vkb_mappings: &std::collections::HashMap<String, vkb_integration::VkbButtonInfo>,
+) {
+    for action_map in &mut action_maps.action_maps {
+        for action in &mut action_map.actions {
+            for rebind in &mut action.rebinds {
+                if let Some(vkb_info) = vkb_mappings.get(&rebind.input) {
+                    rebind.vkb_layer = vkb_info.layer.clone();
+                    rebind.vkb_tempo = vkb_info.tempo.clone();
+                    rebind.vkb_physical_id = Some(vkb_info.physical_id);
+                    rebind.vkb_physical_info = Some(vkb_info.physical_info.clone());
+                }
+            }
         }
     }
 }
@@ -127,7 +149,7 @@ fn load_keybindings(
         std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
     // Parse the XML
-    let action_maps = ActionMaps::from_xml(&xml_content)?;
+    let mut action_maps = ActionMaps::from_xml(&xml_content)?;
 
     // Extract filename from path
     let file_name = std::path::Path::new(&file_path)
@@ -136,8 +158,17 @@ fn load_keybindings(
         .unwrap_or("layout_exported.xml")
         .to_string();
 
-    // Store in state
+    // Get VKB mappings from state
     let mut app_state = state.lock().unwrap();
+    let vkb_mappings = app_state.vkb_mappings.clone();
+
+    // Annotate keybindings with VKB layer information
+    if !vkb_mappings.is_empty() {
+        annotate_with_vkb_info(&mut action_maps, &vkb_mappings);
+        info!("Annotated keybindings with VKB layer information");
+    }
+
+    // Store in state
     app_state.current_bindings = Some(action_maps.clone());
     app_state.current_file_name = Some(file_name);
 
@@ -203,6 +234,10 @@ fn update_binding(
                     input: new_input.clone(),
                     multi_tap,
                     activation_mode: activation_mode.unwrap_or_default(),
+                    vkb_layer: None,
+                    vkb_tempo: None,
+                    vkb_physical_id: None,
+                    vkb_physical_info: None,
                 };
                 eprintln!(
                     "New rebind: input='{}', multi_tap={:?}, activation_mode='{}'",
@@ -281,6 +316,10 @@ fn update_binding(
                             input: new_input.clone(),
                             multi_tap,
                             activation_mode: activation_mode.clone().unwrap_or_default(),
+                            vkb_layer: None,
+                            vkb_tempo: None,
+                            vkb_physical_id: None,
+                            vkb_physical_info: None,
                         };
 
                         // Get the device TYPE of the new input
@@ -304,6 +343,10 @@ fn update_binding(
                                 input: new_input,
                                 multi_tap,
                                 activation_mode: activation_mode.clone().unwrap_or_default(),
+                                vkb_layer: None,
+                                vkb_tempo: None,
+                                vkb_physical_id: None,
+                                vkb_physical_info: None,
                             }],
                         };
                         action_map.actions.push(new_action);
@@ -318,6 +361,10 @@ fn update_binding(
                             input: new_input,
                             multi_tap,
                             activation_mode: activation_mode.unwrap_or_default(),
+                            vkb_layer: None,
+                            vkb_tempo: None,
+                            vkb_physical_id: None,
+                            vkb_physical_info: None,
                         }],
                     };
                     let new_action_map =
@@ -701,6 +748,10 @@ fn clear_specific_binding(
         input: input_to_clear.clone(),
         multi_tap: None,
         activation_mode: String::new(),
+        vkb_layer: None,
+        vkb_tempo: None,
+        vkb_physical_id: None,
+        vkb_physical_info: None,
     };
     let input_type = clear_rebind.get_input_type();
     eprintln!("Input type to clear: {:?}", input_type);
@@ -856,6 +907,10 @@ fn clear_specific_binding(
             input: cleared_input,
             multi_tap: None,
             activation_mode: String::new(),
+            vkb_layer: None,
+            vkb_tempo: None,
+            vkb_physical_id: None,
+            vkb_physical_info: None,
         });
 
         eprintln!("Successfully cleared binding with explicit unbind entry");
@@ -1824,6 +1879,43 @@ fn delete_character_from_installation(
     Ok(())
 }
 
+// VKB Integration commands
+#[tauri::command]
+fn parse_vkb_profile(
+    file_path: String,
+    joystick_id: u8,
+    state: tauri::State<Mutex<AppState>>,
+) -> Result<Vec<vkb_integration::VkbButtonInfo>, String> {
+    info!("Parsing VKB profile from: {} (joystick {})", file_path, joystick_id);
+    let buttons = vkb_integration::parse_vkb_fp3(file_path.into())?;
+    info!("Successfully parsed {} VKB buttons", buttons.len());
+
+    // Build lookup map and store in state
+    let lookup = vkb_integration::build_sc_button_lookup(&buttons, joystick_id);
+    let mut app_state = state.lock().unwrap();
+
+    // Merge with existing mappings (in case multiple joysticks)
+    app_state.vkb_mappings.extend(lookup);
+    info!("Stored {} total VKB button mappings in state", app_state.vkb_mappings.len());
+
+    Ok(buttons)
+}
+
+#[tauri::command]
+fn clear_vkb_mappings(state: tauri::State<Mutex<AppState>>) -> Result<(), String> {
+    let mut app_state = state.lock().unwrap();
+    let count = app_state.vkb_mappings.len();
+    app_state.vkb_mappings.clear();
+    info!("Cleared {} VKB button mappings from state", count);
+    Ok(())
+}
+
+#[tauri::command]
+fn get_vkb_mapping_count(state: tauri::State<Mutex<AppState>>) -> Result<usize, String> {
+    let app_state = state.lock().unwrap();
+    Ok(app_state.vkb_mappings.len())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1876,6 +1968,9 @@ pub fn run() {
             parse_hid_report,
             parse_hid_report_with_descriptor,
             get_hid_descriptor_bytes,
+            parse_vkb_profile,
+            clear_vkb_mappings,
+            get_vkb_mapping_count,
             get_hid_axis_names,
             get_axis_names_for_device,
             get_directinput_to_hid_mapping,
