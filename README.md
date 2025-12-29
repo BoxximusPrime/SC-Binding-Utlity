@@ -71,6 +71,6 @@ Feel free to join us on Discord! https://discord.gg/cjEtkeBG
 
 - I used copilot and my own brain to make the app, and ComfyUI to make the logo.
 
-## Finding this usefull and want support?
+## Finding this usefull and want to support?
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/C0C51OF2NM)
